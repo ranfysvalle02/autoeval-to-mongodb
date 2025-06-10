@@ -518,3 +518,72 @@ Average Factuality Score: 0.64
 """
 ```
 
+## APPENDIX
+
+### **Improving the Score with Simple Prompt Engineering**
+
+Our current average factuality score is **0.64**. While a good start, we can easily improve it by addressing the partial-credit scores. The test cases for "Jaws" and "Titanic" received a `0.6` score because the model returned the title *and* the year (e.g., "Jaws (1975)"), which doesn't exactly match the `expected` output of just the title.
+
+This is a classic opportunity for prompt engineering. The model is being helpful, but *too* helpful. We can make our instructions more specific to get the precise output format we need.
+
+**Original `response_criteria` in the prompt:**
+```
+[response_criteria]
+- Provide a concise answer to the question based on the context and what you know.
+- Respond ONLY with the title of the movie that best matches the question.
+[/response_criteria]
+```
+
+**Improved `response_criteria`:**
+By adding one explicit negative constraint, we can guide the model to the perfect answer.
+
+```
+[response_criteria]
+- Provide a concise answer to the question based on the context and what you know.
+- Respond ONLY with the title of the movie that best matches the question.
+- **DO NOT include the year or any other information in your response.**
+[/response_criteria]
+```
+
+#### Expected Impact
+
+With this single change, the responses for "Jaws" and "Titanic" would almost certainly become exact matches. This would raise their scores from `0.6` to `1.0`.
+
+* **Original Score Calculation:** (1 + 0 + 0.6 + 1 + 0.6) / 5 = **0.64**
+* **Projected Score Calculation:** (1 + 0 + 1 + 1 + 1) / 5 = **0.80**
+
+This demonstrates how a small, targeted change in the prompt can lead to a significant and measurable improvement in the system's performance, highlighting the power of iterative evaluation.
+
+---
+
+### **Appendix: Further Considerations for Evaluation and Debugging**
+
+Building and testing a RAG system often raises more questions than it answers. Here are some deeper considerations inspired by our test results.
+
+#### 1. Is the "Expected" Output Always Correct?
+
+A key question to ask is whether "Jaws" is truly a better answer than "Jaws (1975)". For a user, the more specific answer might be more valuable. Our evaluation penalized the model for providing extra, correct information.
+
+This reveals a crucial concept in automated evaluation: **Your evaluation is only as good as your test data and scoring criteria.**
+
+* **Actionable Insight:** If the year is valuable, the `expected` field in `TEST_DATASET` should be updated to include it. If not, our prompt engineering fix is the correct path. This decision directly shapes the desired behavior of the AI.
+
+#### 2. Debugging the "Back to the Future" Failure
+
+Our prompt engineering tweak would not fix the test case that scored `0`, where the system responded with "Back to the Future Part II". This is a genuine failure that could stem from two primary causes:
+
+1.  **Retrieval Failure:** The `$vectorSearch` query may have retrieved documents for the sequel as being more semantically similar to the prompt than documents for the original film.
+2.  **Generation Failure:** The LLM may have ignored the provided context (which might have been correct) and relied on its own internal, and in this case flawed, knowledge.
+
+**How to investigate this?**
+The first step is to **log the retrieved context**. Modify the `run_rag_task` function to print the `context_str` variable. This allows you to see exactly what information the LLM was given.
+* If the context was about "Part II," then the retrieval step is the problem. You might need to adjust `$vectorSearch` parameters like `numCandidates` or even consider if a different embedding model would create better vector representations for your data.
+* If the context was correct (about the first movie), then the LLM is at fault. You would need to strengthen the prompt further, perhaps by explicitly commanding it to **ignore any prior knowledge and use only the provided context.**
+
+#### 3. The Importance of Structured Responses
+
+The current script uses `response_format={"type": "json_object"}` and asks the model to return a JSON object with specific fields: `response` and `used_provided_context`.
+
+This is an excellent practice for several reasons:
+* **Reliability:** It makes parsing the model's output robust. You are no longer trying to parse a free-form string.
+* **Metadata:** You can ask the model for metadata about its own process. While the `used_provided_context` field is a self-report and not a guarantee, logging it can provide another signal for debugging. If the model consistently says it's not using the context for failed answers, it points toward a generation failure.
