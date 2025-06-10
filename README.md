@@ -2,6 +2,21 @@
 
 ---
 
+### **autoeval-to-mongodb: An End-to-End Blueprint for Building and Validating a RAG System**
+
+This project provides a complete, runnable blueprint for building, testing, and evaluating a Retrieval-Augmented Generation (RAG) application. In today's AI landscape, creating a RAG system is only half the battle; ensuring its reliability and accuracy is paramount. This repository addresses that challenge directly by integrating automated evaluation into the core development workflow.
+
+We demonstrate a practical RAG use case: a movie lookup system that finds film titles based on plot descriptions. The project moves beyond theory and provides a hands-on implementation using a modern, powerful tech stack.
+
+**Key Components:**
+
+* **Database:** A local **MongoDB Atlas** instance running in **Docker**, populated with a sample movie dataset.
+* **Intelligence Engine:** **MongoDB Atlas Vector Search** for semantic retrieval, coupled with **Azure OpenAI** for generating embeddings and final responses.
+* **Core Logic:** A **Python** script that orchestrates the entire RAG pipeline from user prompt to final answer.
+* **Automated Validation:** The **`autoevals` library** is used to systematically measure the system's factuality against a predefined test dataset, producing a quantitative performance score.
+
+The outcome is a tangible demonstration of how to not only build a sophisticated AI system but also to generate a data-driven report card on its performance. This allows developers to iterate, measure improvements, and build more trustworthy AI applications.
+
 ### Prerequisites
 
 * **MongoDB Tools:**
