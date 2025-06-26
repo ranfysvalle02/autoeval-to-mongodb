@@ -887,4 +887,4 @@ The current script uses `response_format={"type": "json_object"}` and asks the m
 
 This is an excellent practice for several reasons:
 * **Reliability:** It makes parsing the model's output robust. You are no longer trying to parse a free-form string.
-* **Metadata:** You can ask the model for metadata about its own process. While the `used_provided_context` field is a self-report and not a guarantee, logging it can provide another signal for debugging. If the model consistently says it's not using the context for failed answers, it points toward a generation failure.
+* **Metadata:** You can ask the model for metadata about its own process. Say for example we had a `used_provided_context` field. While the `used_provided_context` field is a self-report and not a guarantee, logging it can provide another signal for debugging. If the model consistently says it's not using the context for failed answers, it points toward a generation failure.
