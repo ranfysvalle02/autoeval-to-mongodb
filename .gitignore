@@ -1,0 +1,9 @@
+venv/
+.DS_Store
+.env
+.env.local
+*.pyc
+*__pycache__
+.context
+demo.py
+sampledata.archive
