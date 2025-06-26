@@ -1,6 +1,6 @@
 # autoeval-to-mongodb
 
-![](new-demo.png)
+![](newdemo.png)
 
 ![](braintrust-autoevals.png)
 
