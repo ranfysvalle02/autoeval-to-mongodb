@@ -27,6 +27,14 @@ The outcome is a tangible demonstration of how to not only build a sophisticated
 * **Docker:** Installed on your system ([https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/))
 * **wget or curl:** Installed on your system (package managers usually handle this)
 
+### Why does this [autoevals library](https://github.com/braintrustdata/autoevals?tab=readme-ov-file#why-does-this-library-exist) exist?
+
+There is nothing particularly novel about the evaluation methods in the autoevals library. They are all well-known and well-documented. However, there are a few things that are particularly difficult when evaluating in practice:
+
+Normalizing metrics between 0 and 1 is tough. For example, check out the calculation in number.py to see how it's done for numeric differences.
+Parsing the outputs on model-graded evaluations is also challenging. There are frameworks that do this, but it's hard to debug one output at a time, propagate errors, and tweak the prompts. Autoevals makes these tasks easy.
+
+Collecting metrics behind a uniform interface makes it easy to swap out evaluation methods and compare them. Prior to Autoevals, we couldn't find an open source library where you can simply pass in input, output, and expected values through a bunch of different evaluation methods.
 
 ### Setting Up a Local Atlas Environment
 
