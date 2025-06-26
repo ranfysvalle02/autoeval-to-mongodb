@@ -111,23 +111,9 @@ This command uses the `mongorestore` tool to unpack the downloaded archive (`sam
 
 3. **Create the Index:**
 
+
    ```javascript
-   db.embedded_movies.createSearchIndex(
-       "embeddings_1_search_index",
-       "vectorSearch", // index type
-       {
-           fields: [
-               {
-                   "type": "vector",
-                   "numDimensions": 1536,
-                   "path": "plot_embedding",
-                   "similarity": "cosine"
-               },
-               {"type":"filter","path":"genres"},
-               {"type":"filter","path":"type"}
-           ]
-       }
-   );
+   db.embedded_movies.createSearchIndex("embeddings_1_search_index", "vectorSearch", { fields: [ { "type": "vector", "numDimensions": 1536, "path": "plot_embedding", "similarity": "cosine" }, {"type":"filter","path":"genres"}, {"type":"filter","path":"type"} ] });
    ```
 
 4. **Check the Index Status:**
