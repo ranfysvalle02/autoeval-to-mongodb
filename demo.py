@@ -29,7 +29,7 @@ AZURE_EMBEDDING_DEPLOYMENT_NAME = "text-embedding-ada-002"  # Replace with your 
   
 # 3. MongoDB Configuration (Inspired by the provided Flask App)  
 # In your terminal: `export MONGO_URI="mongodb+srv://user:pass@cluster.mongodb.net/?retryWrites=true&w=majority"`  
-MONGO_URI = "" # os.environ.get("MONGO_URI")  # This is required for the script to run  
+MONGO_URI = os.environ.get("MONGO_URI")  # This is required for the script to run  
 
 DB_NAME = "sample_mflix"  # e.g., "knowledge_base"  
 COLLECTION_NAME = "embedded_movies"  # e.g., "embeddings"  
