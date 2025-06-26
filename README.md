@@ -161,42 +161,46 @@ This command uses the `mongorestore` tool to unpack the downloaded archive (`sam
    # FULL CODE
 
 ```python
+from flask import Flask, request, render_template, redirect, url_for, session  
 import os  
 import sys  
+import copy  
 from pymongo import MongoClient  
-from autoevals import Factuality, init  
-"""  
-Factuality Check for Azure OpenAI RAG Task  
-comparing a submitted answer to an expert answer on a given question  
-"""  
-from openai import AzureOpenAI, APIError, AuthenticationError  
+from autoevals import Factuality, LLMClassifier, init  
+from openai import AzureOpenAI  
 import json  
 from datetime import datetime  
+from dotenv import load_dotenv  
+from bson.objectid import ObjectId  
+import time  # For timing  
   
 # --- Configuration ---  
-# It's best practice to set secrets as environment variables.  
-# load the environment variables from a .env file if it exists  
-from dotenv import load_dotenv  
+# Load environment variables  
 load_dotenv()  
-# Ensure the environment variables are set correctly.  
   
-# 2. Azure OpenAI Configuration  
+# Set a secret key for session management  
+SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key")  
+app = Flask(__name__)  
+app.secret_key = SECRET_KEY  
+  
+# Azure OpenAI Configuration  
 AZURE_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "")  
 AZURE_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", "")  
-AZURE_API_VERSION = "2023-12-01-preview"  # Update to your API version  
+AZURE_API_VERSION = "2024-12-01-preview"  # Update to your API version if necessary  
   
-# Deployment names must match those in your Azure AI Studio.  
-AZURE_CHAT_DEPLOYMENT_NAME = "gpt-4o"  # Replace with your GPT-4 deployment name  
-# Add a deployment name for the model used to create embeddings for vector search.  
+# Deployment names available for selection  
+DEPLOYMENT_NAMES = ["o3-mini", "gpt-4o", "gpt-4o-mini"]  # List of available deployment names  
+  
+# Default deployment name  
+DEFAULT_DEPLOYMENT_NAME = "o3-mini"  
+  
+# Azure Embedding Deployment Name  
 AZURE_EMBEDDING_DEPLOYMENT_NAME = "text-embedding-ada-002"  # Replace with your embedding model deployment  
   
-# 3. MongoDB Configuration (Inspired by the provided Flask App)  
-# In your terminal: `export MONGO_URI="mongodb+srv://user:pass@cluster.mongodb.net/?retryWrites=true&w=majority"`  
-MONGO_URI = "" # os.environ.get("MONGO_URI")  # This is required for the script to run  
-
-DB_NAME = "sample_mflix"  # e.g., "knowledge_base"  
-COLLECTION_NAME = "embedded_movies"  # e.g., "embeddings"  
-VECTOR_INDEX_NAME = "embeddings_1_search_index"  # e.g., "vector_index"  
+# MongoDB Configuration  
+MONGO_URI = os.environ.get("MONGO_URI")  # Ensure this is set in your environment variables  
+  
+DB_NAME = "mdb_autoevals"  # Database name  
   
 # --- Client Initialization ---  
 # Initialize Azure OpenAI Client  
@@ -212,8 +216,10 @@ try:
     )  
     # Initialize autoevals with the client  
     init(azure_client)  
+    print("Successfully initialized AzureOpenAI client.")  
 except Exception as e:  
-    print(f"Fatal Error: Could not initialize AzureOpenAI client. Check your configuration. Details: {e}", file=sys.stderr)  
+    print(f"Fatal Error: Could not initialize AzureOpenAI client. Check your configuration. Details: {e}",  
+          file=sys.stderr)  
     sys.exit(1)  
   
 # Initialize MongoDB Client  
@@ -222,14 +228,58 @@ if MONGO_URI:
     try:  
         mongo_client = MongoClient(MONGO_URI)  
         db = mongo_client[DB_NAME]  
-        collection = db[COLLECTION_NAME]  
-        print("Successfully connected to MongoDB.")  
+        test_runs_collection = db["test_runs"]  
+        print(f"Successfully connected to MongoDB '{DB_NAME}' database.")  
     except Exception as e:  
         print(f"Fatal Error: Could not connect to MongoDB. Check MONGO_URI. Details: {e}", file=sys.stderr)  
         sys.exit(1)  
 else:  
-    print("Warning: MONGO_URI is not set. The RAG task will not be able to query the database.", file=sys.stderr)  
+    print(  
+        "Warning: MONGO_URI is not set. The RAG task will not be able to query the database.",  
+        file=sys.stderr,  
+    )  
   
+# --- Metric Definitions and Initialization ---  
+# Define custom scorer function  
+def exact_match(output, expected, **kwargs):  
+    score = 1 if output.strip().lower() == expected.strip().lower() else 0  
+    reason = "Exact match" if score == 1 else "Output does not match expected output"  
+    metadata = {'expected': expected, 'output': output}  
+    # Wrap score in an object with 'score', 'reason', 'metadata' attributes  
+    return type('Result', (object,), {'score': score, 'reason': reason, 'metadata': metadata})  
+  
+# Initialize instances of metric evaluators  
+factuality_evaluator = Factuality(client=azure_client)  # Pass the Azure client  
+kid_friendly_classifier = LLMClassifier(  
+    name="Kid-Friendly Movie Classifier",  
+    prompt_template=(  
+        "On a scale of 0 to 1, where 1 is perfectly suitable for children under 13 years old and 0 is completely unsuitable, "  
+        "how kid-friendly is the following movie description? "  
+        "Choose one of the following categories that best represents the score:\n"  
+        "- 'Category_0.0' (Completely Unsuitable - score 0.0-0.1)\n"  
+        "- 'Category_0.25' (Mostly Unsuitable - score 0.1-0.4)\n"  
+        "- 'Category_0.5' (Moderately Kid-Friendly - score 0.4-0.6)\n"  
+        "- 'Category_0.75' (Very Kid-Friendly - score 0.6-0.9)\n"  
+        "- 'Category_1.0' (Perfectly Suitable - score 0.9-1.0)\n\n"  
+        "Movie Description: {{output}}"  
+    ),  
+    choice_scores={  
+        "Category_0.0": 0.0,  
+        "Category_0.25": 0.25,  
+        "Category_0.5": 0.5,  
+        "Category_0.75": 0.75,  
+        "Category_1.0": 1.0,  
+    },  
+    use_cot=True,  
+    client=azure_client  # Pass the Azure client  
+)  
+  
+# Define available metrics  
+METRICS = {  
+    'Factuality': factuality_evaluator,     # Instance of Factuality evaluator  
+    'Exact Match': exact_match,             # Custom exact match scorer (function)  
+    'Kid Friendly': kid_friendly_classifier,    # Instance of LLMClassifier  
+}  
   
 # --- Helper Functions for RAG ---  
   
@@ -247,21 +297,19 @@ def get_embedding(text: str, model: str = AZURE_EMBEDDING_DEPLOYMENT_NAME) -> li
 def perform_vector_search(vector: list) -> list:  
     """  
     Performs a $vectorSearch query in MongoDB to find relevant documents.  
-    This function is similar to the `knowledge_repo.vector_search` in the provided Flask app.  
     """  
     if not mongo_client:  
         print("Cannot perform vector search, MongoDB client not initialized.", file=sys.stderr)  
         return []  
-    
-    # This is the aggregation pipeline that uses the vector index  
+  
     pipeline = [  
         {  
             "$vectorSearch": {  
-                "index": VECTOR_INDEX_NAME,  
+                "index": "embeddings_1_search_index",  
                 "path": "plot_embedding",  # The field in your documents that contains the vector  
                 "queryVector": vector,  
                 "numCandidates": 200,  # Number of candidates to consider  
-                "limit": 5             # Number of results to return  
+                "limit": 5,            # Number of results to return  
             }  
         },  
         {  
@@ -269,255 +317,498 @@ def perform_vector_search(vector: list) -> list:
                 "_id": 0,  
                 "score": {"$meta": "vectorSearchScore"},  
                 "title": 1,  
-                "plot": 1,
+                "plot": 1,  
                 "year": 1,  
             }  
-        }  
+        },  
     ]  
     try:  
-        results = list(collection.aggregate(pipeline))  
+        results = list(mongo_client["sample_mflix"]["embedded_movies"].aggregate(pipeline))  
         return results  
     except Exception as e:  
         print(f"Error during vector search in MongoDB: {e}", file=sys.stderr)  
         return []  
   
-  
-# --- Task Definition (RAG Workflow) ---  
-  
-def run_rag_task(input_prompt: str) -> str:  
+def run_rag_task(input_prompt: str, deployment_name: str, response_criteria: str, system_prompt_template: str, user_prompt_template: str):  
     """  
     Executes the full Retrieval-Augmented Generation (RAG) task:  
     1. Generates an embedding for the input.  
     2. Retrieves context from MongoDB via vector search.  
     3. Generates a final response using the retrieved context.  
+    Returns the generated response, the messages sent to the Azure client, and the context documents.  
     """  
     if not azure_client:  
-        return "Error: Azure OpenAI client is not initialized."  
+        return "Error: Azure OpenAI client is not initialized.", [], []  
     if not mongo_client:  
-        return "Error: MongoDB client is not initialized."  
+        return "Error: MongoDB client is not initialized.", [], []  
   
     # 1. Get query vector  
     print(f"Generating embedding for query: '{input_prompt}'")  
     query_vector = get_embedding(input_prompt)  
     if not query_vector:  
-        return "Error: Failed to generate embedding for the query."  
+        return "Error: Failed to generate embedding for the query.", [], []  
   
     # 2. Query MongoDB for context  
     print("Performing vector search in MongoDB...")  
     context_docs = perform_vector_search(query_vector)  
     if not context_docs:  
         print("No context found from vector search.", file=sys.stderr)  
-        # Fallback: answer without context  
+        # Fallback: provide default context or handle as needed  
         context_str = "No specific context was found."  
     else:  
         print(f"Retrieved {len(context_docs)} documents from MongoDB.")  
         # Format the context for the prompt  
-        context_str = "\n".join([f"- {doc['title']} ({doc['year']}) \n\n {doc['plot']}" for doc in context_docs])  
+        context_str = "\n".join(  
+            [f"- {doc['title']} ({doc['year']})\n\n{doc['plot']}" for doc in context_docs]  
+        )  
   
     # 3. Generate response from the chat model with the retrieved context  
-      
-    try:  
-        response = azure_client.chat.completions.create(  
-            model=AZURE_CHAT_DEPLOYMENT_NAME,  
-            messages=[  
-                    {  
-                        "role": "system",  
-                        "content": f"""  
-Provide the answer in JSON, with the answer for the user in the field `response` and whether the provided context was used in `used_provided_context`.  
-Below in the context, you will find bits of the plot of movies.
-If the context is relevant to the question, use it to provide a more accurate answer.
-[context]  
-{context_str}  
-[/context]  
-                        """  
-                    },  
-                    {  
-                        "role": "user",  
-                        "content": f"""  
-[response_criteria]  
-- Provide a concise answer to the question based on the context and what you know.  
-- Respond ONLY with the title of the movie that best matches the question.
-[/response_criteria]  
   
-[question]  
-{input_prompt}  
-[/question]  
-                        """  
-                    }  
-                ],  
-            stream=False,  
-            response_format={"type": "json_object"}  
+    try:  
+        # Format the system and user prompts with the provided templates  
+        system_prompt = system_prompt_template.replace("{context}", context_str)  
+        user_prompt = user_prompt_template.replace("{response_criteria}", response_criteria).replace("{question}", input_prompt)  
+  
+        messages = [  
+            {  
+                "role": "system",  
+                "content": system_prompt,  
+            },  
+            {  
+                "role": "user",  
+                "content": user_prompt,  
+            },  
+        ]  
+  
+        response = azure_client.chat.completions.create(  
+            model=deployment_name,  
+            messages=messages,  
+            stream=False  
         )  
-        json_answer = json.loads(response.choices[0].message.content.strip())  
-        return json_answer["response"].strip() if "response" in json_answer else "No response provided."  
+        generated_response = response.choices[0].message.content.strip()  
+        return generated_response, messages, context_docs  # Return the context_docs as well  
     except Exception as e:  
         print(f"An unexpected error occurred during chat completion: {e}", file=sys.stderr)  
-        return ""  
+        return "", [], context_docs  # Return empty response and messages on error, but pass context_docs  
   
-# Define a shared dataset for local validation.
-TEST_DATASET = [
-  {
-    "id": 1,
-    "input": "Movie where a cannibal genius helps an FBI trainee hunt another killer.",
-    "expected": "The Silence of the Lambs"
-  },
-  {
-    "id": 2,
-    "input": "A kid in a time-traveling DeLorean has to make his parents fall in love at a high school dance.",
-    "expected": "Back to the Future"
-  },
-  {
-    "id": 3,
-    "input": "Giant shark terrorizes a beach town and the police chief says they're 'gonna need a bigger boat'.",
-    "expected": "Jaws"
-  },
-  {
-    "id": 4,
-    "input": "A hacker has to choose between a red pill and a blue pill to see the true nature of reality.",
-    "expected": "The Matrix"
-  },
-  {
-    "id": 5,
-    "input": "An old woman tells her story of a tragic romance on a doomed ship and a lost blue diamond necklace.",
-    "expected": "Titanic"
-  }
-]
+# Test Dataset  
+TEST_DATASET = [  
+    {  
+        "id": 1,  
+        "input": "A boy befriends a giant robot from outer space. \nWhat is the movie?",  
+        "expected": "The Iron Giant"  
+    },  
+    {  
+        "id": 2,  
+        "input": "An 8-year-old boy genius and his friends must rescue their parents. \nWhat is the movie?",  
+        "expected": "Jimmy Neutron: Boy Genius"  
+    },  
+    {  
+        "id": 3,  
+        "input": "An isolated research facility becomes the battleground as a trio of intelligent sharks fight back. \nWhat is the movie?",  
+        "expected": "Deep Blue Sea"  
+    },  
+    {  
+        "id": 4,  
+        "input": "A hacker has to choose between a red pill and a blue pill to see the true nature of reality. \nWhat is the movie?",  
+        "expected": "The Matrix"  
+    },  
+    {  
+        "id": 5,  
+        "input": "When two kids find and play a magical board game, they release a man trapped for decades and a host of dangers that can only be stopped by finishing the game. \nWhat is the movie?",  
+        "expected": "Jumanji"  
+    },  
+]  
   
-def test_rag_task_with_factuality():  
-    """Runs the RAG task on test data, evaluates factuality, and stores results in a JSON object."""  
-    factual = Factuality()  
+def get_test_dataset_from_form(form_data):  
+    """Extract test cases from form data."""  
+    test_case_count = int(form_data.get('test_case_count', 0))  
+    test_dataset = []  
+    for idx in range(test_case_count):  
+        input_prompt = form_data.get(f'input_prompt_{idx}', '').strip()  
+        expected_output = form_data.get(f'expected_output_{idx}', '').strip()  
+        if input_prompt:  
+            test_case = {  
+                'id': idx + 1,  
+                'input': input_prompt,  
+                'expected': expected_output  
+            }  
+            test_dataset.append(test_case)  
+    return test_dataset  
   
+def test_rag_task_with_metrics(test_dataset, deployment_name, response_criteria, system_prompt_template, user_prompt_template, selected_metrics):  
+    """Runs the RAG task on test data, evaluates selected metrics, and returns the results."""  
     test_run = {  
         "timestamp": datetime.utcnow().isoformat(),  
+        "deployment_name": deployment_name,  
+        "response_criteria": response_criteria,  
+        "system_prompt_template": system_prompt_template,  
+        "user_prompt_template": user_prompt_template,  
+        "selected_metrics": selected_metrics,  
         "test_cases": [],  
-        "average_score": None  
+        "average_scores": {},  # Average scores per metric  
     }  
-    total_score = 0  
   
-    for idx, test_case in enumerate(TEST_DATASET):  
+    # Start timing  
+    start_time = time.perf_counter()  
+  
+    # Initialize total scores per metric  
+    total_scores = {metric: 0 for metric in selected_metrics}  
+  
+    for idx, test_case in enumerate(test_dataset):  
         input_prompt = test_case["input"]  
         expected_output = test_case["expected"].strip()  
   
-        generated_output = run_rag_task(input_prompt)  
+        generated_output, messages, context_docs = run_rag_task(input_prompt, deployment_name, response_criteria, system_prompt_template, user_prompt_template)  
   
-        result = factual.eval(  
-            input=input_prompt,  
-            output=generated_output,  
-            expected=expected_output  
-        )  
+        metric_results = {}  
+  
+        for metric_name in selected_metrics:  
+            evaluator = METRICS.get(metric_name)  
+            if not evaluator:  
+                print(f"Evaluator for {metric_name} is not initialized.", file=sys.stderr)  
+                continue  
+  
+            # Prepare inputs for each metric  
+            if callable(evaluator) and not hasattr(evaluator, 'eval'):  
+                # For function-based metrics like exact_match  
+                result = evaluator(  
+                    output=generated_output,  
+                    expected=expected_output  
+                )  
+            elif hasattr(evaluator, 'eval'):  
+                # For class-based evaluators with an eval method  
+                if metric_name == "Factuality":  
+                    # Ensure that 'expected_output' is provided for Factuality evaluation  
+                    if not expected_output:  
+                        print(f"Expected output is required for Factuality evaluation in Test Case {idx+1}.", file=sys.stderr)  
+                        result = type('Result', (object,), {'score': 0, 'reason': 'Expected output is missing.', 'metadata': {}})  
+                    else:  
+                        result = evaluator.eval(  
+                            input=input_prompt,  
+                            output=generated_output,  
+                            expected=expected_output  
+                        )  
+                elif metric_name == "Kid Friendly":  
+                    result = evaluator.eval(  
+                        output=generated_output  
+                    )  
+                else:  
+                    print(f"Metric {metric_name} is not recognized.", file=sys.stderr)  
+                    continue  
+            else:  
+                print(f"Evaluator for {metric_name} is not callable or does not have an eval method.", file=sys.stderr)  
+                continue  
+  
+            # Collect 'score', 'reason', 'metadata'  
+            metric_results[metric_name] = {  
+                'score': result.score,  
+                'reason': getattr(result, 'reason', ''),  
+                'metadata': getattr(result, 'metadata', {}),  
+            }  
+            total_scores[metric_name] += result.score  
   
         test_case_result = {  
             "test_case_id": test_case.get("id", idx + 1),  
             "input_prompt": input_prompt,  
             "expected_output": expected_output,  
             "generated_output": generated_output,  
-            "factuality_score": result.score,  
+            "metric_results": metric_results,  
+            "messages": messages,  # Store the messages sent to the Azure client  
+            "context_docs": context_docs,  # Store the context documents  
         }  
   
         test_run["test_cases"].append(test_case_result)  
-        total_score += result.score  
   
         print(f"\n{'='*10} Test Case {idx+1} {'='*10}")  
         print(f"Input Prompt:\n{input_prompt}")  
         print(f"Expected Output:\n{expected_output}")  
         print(f"Generated Output:\n{generated_output}")  
-        print(f"Factuality Score: {result.score}")  
+        print(f"Metric Results:")  
+        for m_name, res in metric_results.items():  
+            print(f"- {m_name} Score: {res['score']}")  
+            print(f"  Metadata: {res['metadata']}")  
         print(f"{'='*30}")  
   
-    # Calculate average score  
-    average_score = total_score / len(TEST_DATASET) if TEST_DATASET else 0  
-    test_run["average_score"] = average_score  
+    # Calculate average scores per metric  
+    for metric_name in total_scores:  
+        average_score = total_scores[metric_name] / len(test_dataset) if test_dataset else 0  
+        test_run["average_scores"][metric_name] = average_score  
   
     print("\n--- Test Run Summary ---")  
-    print(f"Average Factuality Score: {average_score}")  
+    for metric_name, avg_score in test_run["average_scores"].items():  
+        print(f"Average {metric_name} Score: {avg_score}")  
   
-    # Pretty-print the JSON object  
-    print("\n--- JSON Object for Test Run ---")  
-    print(json.dumps(test_run, indent=4))  
+    # End timing  
+    end_time = time.perf_counter()  
+    total_duration = end_time - start_time  
+    test_run["total_duration_seconds"] = total_duration  
   
-    # Optionally, return the test_run object for further processing or storage  
     return test_run  
   
-def validate_locally():  
+# --- Flask Routes ---  
+  
+@app.route('/', methods=['GET'])  
+def index():  
+    # Fetch previous test runs from MongoDB  
+    previous_runs = list(  
+        test_runs_collection.find(  
+            {},  
+            {  
+                "timestamp": 1,  
+                "deployment_name": 1,  
+                "average_scores": 1,  
+                "response_criteria": 1,  
+                "system_prompt_template": 1,  
+                "user_prompt_template": 1,  
+                "test_cases.input_prompt": 1,  
+                "selected_metrics": 1,  
+                "total_duration_seconds": 1,  # Include the total duration  
+            }  
+        ).sort("timestamp", -1).limit(10)  
+    )  # Get last 10 runs  
+  
+    # Use the test dataset from the session if available  
+    if 'test_dataset' in session:  
+        test_dataset = session['test_dataset']  
+    else:  
+        test_dataset = copy.deepcopy(TEST_DATASET)  
+  
+    default_response_criteria = """  
+- Provide a concise answer to the question based ONLY on the context.  
+- Respond ONLY with the complete title of the movie that best matches the question.  
     """  
-    Runs the RAG task on a local dataset and prints the 'expected' vs 'got'  
-    output directly to the console for immediate validation.  
+    default_system_prompt = """  
+Below is the context, which includes plots of movies.  
+  
+[context]  
+{context}  
+[/context]  
     """  
-    print("--- Starting Local Validation ---")  
+    default_user_prompt = """  
+[response_criteria]  
+{response_criteria}  
+[/response_criteria]  
   
-    for i, item in enumerate(TEST_DATASET):  
-        print(f"\n{'='*10} Test Case {i+1} {'='*10}")  
-        input_prompt = item["input"]  
-        expected_output = item["expected"].strip()  
+[question]  
+{question}  
+[/question]  
+    """  
   
-        got_output = run_rag_task(input_prompt)  
+    # Prepare the list of available metrics and mark Factuality as selected by default  
+    available_metrics = [{'name': name, 'selected': (name == 'Factuality')} for name in METRICS.keys()]  
   
-        print("\n--- Comparison ---")  
-        print(f"INPUT:\n{input_prompt}")  
-        print(f"EXPECTED:\n{expected_output}")  
-        print(f"GOT:\n{got_output}")  
-        print(f"{'='*33}")  
+    return render_template(  
+        'index.html',  
+        test_dataset=test_dataset,  
+        deployment_names=DEPLOYMENT_NAMES,  
+        default_deployment=DEFAULT_DEPLOYMENT_NAME,  
+        previous_runs=previous_runs,  
+        default_response_criteria=default_response_criteria.strip(),  
+        default_system_prompt=default_system_prompt.strip(),  
+        default_user_prompt=default_user_prompt.strip(),  
+        current_year=datetime.utcnow().year,  # Pass current_year to template  
+        available_metrics=available_metrics  
+    )  
   
-        # Simple check  
-        if expected_output.lower() in got_output.lower():  
-             print("RESULT:   Contains expected text.")  
+@app.route('/add_test_case', methods=['POST'])  
+def add_test_case():  
+    # Get the test case data from the form  
+    input_prompt = request.form.get('new_input_prompt', '').strip()  
+    expected_output = request.form.get('new_expected_output', '').strip()  
+  
+    # Retrieve the current test dataset from the session or default  
+    if 'test_dataset' in session:  
+        test_dataset = session['test_dataset']  
+    else:  
+        test_dataset = copy.deepcopy(TEST_DATASET)  
+  
+    if input_prompt:  
+        new_test_case = {  
+            'id': len(test_dataset) + 1,  
+            'input': input_prompt,  
+            'expected': expected_output  
+        }  
+  
+        test_dataset.append(new_test_case)  
+        session['test_dataset'] = test_dataset  # Update the session  
+  
+    return redirect(url_for('index'))  
+  
+@app.route('/remove_test_case', methods=['POST'])  
+def remove_test_case():  
+    # Get the test case id to remove  
+    test_case_id = int(request.form.get('test_case_id_to_remove', '-1'))  
+  
+    if 'test_dataset' in session:  
+        test_dataset = session['test_dataset']  
+    else:  
+        test_dataset = copy.deepcopy(TEST_DATASET)  
+  
+    # Remove the test case with the matching id  
+    test_dataset = [tc for tc in test_dataset if tc['id'] != test_case_id]  
+  
+    # Renumber the ids  
+    for idx, tc in enumerate(test_dataset, start=1):  
+        tc['id'] = idx  
+  
+    session['test_dataset'] = test_dataset  # Update the session  
+  
+    return redirect(url_for('index'))  
+  
+@app.route('/run_test', methods=['POST'])  
+def run_test():  
+    # Extract test cases from form data  
+    test_dataset = get_test_dataset_from_form(request.form)  
+    # Retrieve the selected deployment name from the form  
+    deployment_name = request.form.get('deployment_name', DEFAULT_DEPLOYMENT_NAME)  
+    # Get the response criteria from the form  
+    response_criteria = request.form.get('response_criteria', '').strip()  
+    # Get system and user prompt templates  
+    system_prompt_template = request.form.get('system_prompt_template', '').strip()  
+    user_prompt_template = request.form.get('user_prompt_template', '').strip()  
+    # Get selected metrics  
+    selected_metrics = request.form.getlist('metrics')  
+    if not selected_metrics:  
+        # Default to Factuality if no metrics are selected  
+        selected_metrics = ['Factuality']  
+    # Run the test  
+    test_run_data = test_rag_task_with_metrics(test_dataset, deployment_name, response_criteria, system_prompt_template, user_prompt_template, selected_metrics)  
+  
+    # Save test run data to MongoDB  
+    inserted_id = test_runs_collection.insert_one(test_run_data).inserted_id  
+    test_run_data['_id'] = inserted_id  # Include the ID for rendering  
+  
+    return render_template('test_results.html', test_run=test_run_data, current_year=datetime.utcnow().year)  
+  
+@app.route('/preview', methods=['POST'])  
+def preview():  
+    # Get the index of the test case to preview  
+    idx = int(request.form.get('test_case_idx', -1))  
+    if idx < 0:  
+        return "Error: Invalid test case index.", 400  
+  
+    # Directly extract the input prompt and expected output for the specific test case  
+    input_prompt = request.form.get(f'input_prompt_{idx}', '').strip()  
+    expected_output = request.form.get(f'expected_output_{idx}', '').strip()  
+    if not input_prompt:  
+        return "Error: Input prompt is empty.", 400  
+  
+    # Retrieve the selected deployment name from the form  
+    deployment_name = request.form.get('deployment_name', DEFAULT_DEPLOYMENT_NAME)  
+    # Get the response criteria from the form  
+    response_criteria = request.form.get('response_criteria', '').strip()  
+    # Get system and user prompt templates  
+    system_prompt_template = request.form.get('system_prompt_template', '').strip()  
+    user_prompt_template = request.form.get('user_prompt_template', '').strip()  
+    # Get selected metrics  
+    selected_metrics = request.form.getlist('metrics')  
+    if not selected_metrics:  
+        # Default to Factuality if no metrics are selected  
+        selected_metrics = ['Factuality']  
+  
+    generated_output, messages, context_docs = run_rag_task(input_prompt, deployment_name, response_criteria, system_prompt_template, user_prompt_template)  
+  
+    metric_results = {}  
+  
+    for metric_name in selected_metrics:  
+        evaluator = METRICS.get(metric_name)  
+        if not evaluator:  
+            print(f"Evaluator for {metric_name} is not initialized.", file=sys.stderr)  
+            continue  
+  
+        # Prepare inputs for each metric  
+        if callable(evaluator) and not hasattr(evaluator, 'eval'):  
+            # For function-based metrics like exact_match  
+            result = evaluator(  
+                output=generated_output,  
+                expected=expected_output  
+            )  
+        elif hasattr(evaluator, 'eval'):  
+            # For class-based evaluators with an eval method  
+            if metric_name == "Factuality":  
+                # Ensure that 'expected_output' is provided for Factuality evaluation  
+                if not expected_output:  
+                    print(f"Expected output is required for Factuality evaluation in preview.", file=sys.stderr)  
+                    result = type('Result', (object,), {'score': 0, 'reason': 'Expected output is missing.', 'metadata': {}})  
+                else:  
+                    result = evaluator.eval(  
+                        input=input_prompt,  
+                        output=generated_output,  
+                        expected=expected_output  
+                    )  
+            elif metric_name == "Kid Friendly":  
+                result = evaluator.eval(  
+                    output=generated_output  
+                )  
+            else:  
+                print(f"Metric {metric_name} is not recognized.", file=sys.stderr)  
+                continue  
         else:  
-             print("RESULT:   Does NOT contain expected text.")  
+            print(f"Evaluator for {metric_name} is not callable or does not have an eval method.", file=sys.stderr)  
+            continue  
   
-if __name__ == "__main__":  
-    # Run the test with factuality scoring and produce a structured JSON object  
-    test_run_data = test_rag_task_with_factuality()  
+        # Collect 'score', 'reason', 'metadata'  
+        metric_results[metric_name] = {  
+            'score': result.score,  
+            'reason': getattr(result, 'reason', ''),  
+            'metadata': getattr(result, 'metadata', {}),  
+        }  
+  
+    test_case_result = {  
+        "input_prompt": input_prompt,  
+        "expected_output": expected_output,  
+        "generated_output": generated_output,  
+        "metric_results": metric_results,  
+        "deployment_name": deployment_name,  
+        "response_criteria": response_criteria,  
+        "system_prompt_template": system_prompt_template,  
+        "user_prompt_template": user_prompt_template,  
+        "messages": messages,  # Store the messages  
+        "context_docs": context_docs,  # Include the context documents  
+    }  
+    # Render only the content  
+    return render_template('preview_content.html', test_case=test_case_result)  
+  
+@app.route('/test_runs', methods=['GET'])  
+def test_runs():  
+    # Fetch all test runs  
+    runs = list(  
+        test_runs_collection.find(  
+            {},  
+            {  
+                "timestamp": 1,  
+                "deployment_name": 1,  
+                "average_scores": 1,  
+                "response_criteria": 1,  
+                "system_prompt_template": 1,  
+                "user_prompt_template": 1,  
+                "test_cases.input_prompt": 1,  
+                "selected_metrics": 1,  
+                "total_duration_seconds": 1,  # Include the total duration  
+            }  
+        ).sort("timestamp", -1)  
+    )  
+    return render_template('test_run_list.html', test_runs=runs, current_year=datetime.utcnow().year)  
+  
+@app.route('/test_run/<string:run_id>', methods=['GET'])  
+def view_test_run(run_id):  
+    # Retrieve test run data from MongoDB using the run_id  
+    test_run = test_runs_collection.find_one({"_id": ObjectId(run_id)})  
+    if not test_run:  
+        return "Test run not found."  
+    return render_template('test_results.html', test_run=test_run, current_year=datetime.utcnow().year)  
+  
+@app.route('/reset', methods=['GET'])  
+def reset():  
+    # Clear the test_dataset from the session  
+    session.pop('test_dataset', None)  
+    # Redirect to home, defaults will be loaded  
+    return redirect(url_for('index'))  
+  
+if __name__ == '__main__':  
+    app.run(debug=True)
 
-
-"""
-==============================
-
---- Test Run Summary ---
-Average Factuality Score: 0.64
-
---- JSON Object for Test Run ---
-{
-    "timestamp": "2025-06-10T05:39:13.523631",
-    "test_cases": [
-        {
-            "test_case_id": 1,
-            "input_prompt": "Movie where a cannibal genius helps an FBI trainee hunt another killer.",
-            "expected_output": "The Silence of the Lambs",
-            "generated_output": "The Silence of the Lambs",
-            "factuality_score": 1
-        },
-        {
-            "test_case_id": 2,
-            "input_prompt": "A kid in a time-traveling DeLorean has to make his parents fall in love at a high school dance.",
-            "expected_output": "Back to the Future",
-            "generated_output": "Back to the Future Part II",
-            "factuality_score": 0
-        },
-        {
-            "test_case_id": 3,
-            "input_prompt": "Giant shark terrorizes a beach town and the police chief says they're 'gonna need a bigger boat'.",
-            "expected_output": "Jaws",
-            "generated_output": "Jaws (1975)",
-            "factuality_score": 0.6
-        },
-        {
-            "test_case_id": 4,
-            "input_prompt": "A hacker has to choose between a red pill and a blue pill to see the true nature of reality.",
-            "expected_output": "The Matrix",
-            "generated_output": "The Matrix",
-            "factuality_score": 1
-        },
-        {
-            "test_case_id": 5,
-            "input_prompt": "An old woman tells her story of a tragic romance on a doomed ship and a lost blue diamond necklace.",
-            "expected_output": "Titanic",
-            "generated_output": "Titanic (1996)",
-            "factuality_score": 0.6
-        }
-    ],
-    "average_score": 0.64
-}
-"""
 ```
 
 ## APPENDIX
