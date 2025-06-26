@@ -1,0 +1,199 @@
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>All Test Runs</title>  
+    <!-- Include Google Fonts and Font Awesome -->  
+    <link rel="preconnect" href="https://fonts.googleapis.com">  
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">  
+    <!-- Include Font Awesome for Icons -->  
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>  
+  
+    <!-- Embedded CSS Styles -->  
+    <style>  
+        /* Include the same styles as in index.html */  
+        /* Global Styles */  
+        body {  
+            margin: 0;  
+            font-family: 'Roboto', sans-serif;  
+            background-color: #f5f7fa;  
+            color: #333;  
+        }  
+  
+        header, footer {  
+            background-color: #2c3e50;  
+            color: white;  
+            padding: 1em 0;  
+            text-align: center;  
+            position: sticky;  
+            top: 0;  
+            z-index: 1000;  
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);  
+        }  
+  
+        header h1 {  
+            margin: 0;  
+            font-weight: normal;  
+        }  
+  
+        main {  
+            padding: 2em;  
+            max-width: 1200px;  
+            margin: 0 auto;  
+        }  
+  
+        h2 {  
+            color: #2c3e50;  
+            margin-top: 1.5em;  
+        }  
+  
+        a {  
+            color: #3498db;  
+            text-decoration: none;  
+        }  
+  
+        a:hover {  
+            text-decoration: underline;  
+        }  
+  
+        /* Button Styles */  
+        .btn {  
+            display: inline-block;  
+            padding: 0.5em 1em;  
+            margin: 0.2em 0;  
+            background-color: #3498db;  
+            color: white;  
+            border: none;  
+            border-radius: 4px;  
+            cursor: pointer;  
+            transition: background-color 0.3s ease, transform 0.1s ease;  
+            text-decoration: none;  
+            text-align: center;  
+        }  
+  
+        .btn:hover {  
+            background-color: #2980b9;  
+            transform: translateY(-2px);  
+        }  
+  
+        .btn:active {  
+            transform: translateY(0);  
+        }  
+  
+        .btn.icon {  
+            padding: 0.5em;  
+            width: 2.5em;  
+            height: 2.5em;  
+            text-align: center;  
+        }  
+  
+        .btn.icon i {  
+            margin: 0;  
+        }  
+  
+        .table-responsive {  
+            overflow-x: auto;  
+            margin-bottom: 1.5em;  
+        }  
+  
+        table {  
+            width: 100%;  
+            border-collapse: collapse;  
+            background-color: white;  
+            margin-bottom: 1em;  
+        }  
+  
+        table thead {  
+            background-color: #34495e;  
+            color: white;  
+            text-align: left;  
+        }  
+  
+        table th, table td {  
+            padding: 1em;  
+            border-bottom: 1px solid #ddd;  
+            vertical-align: middle;  
+        }  
+  
+        table tbody tr {  
+            transition: background-color 0.3s ease;  
+        }  
+  
+        table tbody tr:hover {  
+            background-color: #f9f9f9;  
+        }  
+  
+        /* Responsive Design */  
+        @media (max-width: 768px) {  
+            main {  
+                padding: 1em;  
+            }  
+            table th, table td {  
+                padding: 0.5em;  
+            }  
+        }  
+    </style>  
+</head>  
+<body>  
+    <header>  
+        <h1>All Test Runs</h1>  
+    </header>  
+  
+    <main>  
+        <section>  
+            <div class="table-responsive">  
+                <table>  
+                    <thead>  
+                        <tr>  
+                            <th>Timestamp</th>  
+                            <th>Deployment Name</th>  
+                            <th>Average Score</th>  
+                            <th>Number of Test Cases</th>  
+                            <th>Duration (s)</th> <!-- Added this column -->  
+                            <th>Questions Asked</th>  
+                            <th>Actions</th>  
+                        </tr>  
+                    </thead>  
+                    <tbody>  
+                        {% for run in test_runs %}  
+                        <tr>  
+                            <td>{{ run.timestamp }}</td>  
+                            <td>{{ run.deployment_name }}</td>  
+                            <td>  
+                                {% for metric_name, avg_score in run.average_scores.items() %}  
+                                    {{ metric_name }}: {{ "%.2f"|format(avg_score) }}<br>  
+                                {% endfor %}  
+                            </td>  
+                            <td>{{ run.test_cases | length }}</td>  
+                            <td>  
+                                {% if run.total_duration_seconds %}  
+                                    {{ "%.2f"|format(run.total_duration_seconds) }}  
+                                {% else %}  
+                                    N/A  
+                                {% endif %}  
+                            </td> <!-- Added duration display -->  
+                            <td>  
+                                {% for case in run.test_cases %}  
+                                    {{ loop.index }}. {{ case.input_prompt | truncate(50) }}<br>  
+                                {% endfor %}  
+                            </td>  
+                            <td>  
+                                <a href="/test_run/{{ run._id }}" class="btn icon" title="View Results"><i class="fa fa-file-alt"></i></a>  
+                            </td>  
+                        </tr>  
+                        {% endfor %}  
+                    </tbody>  
+                </table>  
+            </div>  
+  
+            <div class="form-actions">  
+                <a href="/" class="btn"><i class="fa fa-home"></i> Back to Home</a>  
+            </div>  
+        </section>  
+    </main>  
+  
+    <footer>  
+        <p>&copy; {{ current_year }} Your Company Name</p>  
+    </footer>  
+</body>  
+</html>  

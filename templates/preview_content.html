@@ -1,0 +1,81 @@
+<h3>Test Case Preview</h3>  
+<p><strong>Deployment Name:</strong> {{ test_case.deployment_name }}</p>  
+  
+<h4>System Prompt Template Used:</h4>  
+<pre>{{ test_case.system_prompt_template }}</pre>  
+  
+<h4>User Prompt Template Used:</h4>  
+<pre>{{ test_case.user_prompt_template }}</pre>  
+  
+<h4>Response Criteria Used:</h4>  
+<pre>{{ test_case.response_criteria }}</pre>  
+  
+<h4>Test Case Details</h4>  
+<table>  
+    <tr>  
+        <th>Input Prompt</th>  
+        <td>{{ test_case.input_prompt }}</td>  
+    </tr>  
+    <tr>  
+        <th>Expected Output</th>  
+        <td>{{ test_case.expected_output }}</td>  
+    </tr>  
+    <tr>  
+        <th>Generated Output</th>  
+        <td>{{ test_case.generated_output }}</td>  
+    </tr>  
+    {% for metric_name, result in test_case.metric_results.items() %}  
+    <tr>  
+        <th>{{ metric_name }} Score</th>  
+        <td>{{ "%.2f"|format(result.score) }}</td>  
+    </tr>  
+    {% endfor %}  
+</table>  
+  
+<h4><button type="button" class="collapsible">Context Documents Retrieved from MongoDB</button></h4>  
+<div class="content">  
+    <div class="table-responsive">  
+        <table>  
+            <thead>  
+                <tr>  
+                    <th>Score</th>  
+                    <th>Title</th>  
+                    <th>Year</th>  
+                    <th>Plot</th>  
+                </tr>  
+            </thead>  
+            <tbody>  
+                {% for doc in test_case.context_docs %}  
+                <tr>  
+                    <td>{{ "%.4f"|format(doc.score) }}</td>  
+                    <td>{{ doc.title }}</td>  
+                    <td>{{ doc.year }}</td>  
+                    <td>{{ doc.plot }}</td>  
+                </tr>  
+                {% endfor %}  
+            </tbody>  
+        </table>  
+    </div>  
+</div>  
+  
+<h4><button type="button" class="collapsible">Messages Sent to Azure Client</button></h4>  
+<div class="content">  
+    <div class="table-responsive">  
+        <table>  
+            <thead>  
+                <tr>  
+                    <th>Role</th>  
+                    <th>Content</th>  
+                </tr>  
+            </thead>  
+            <tbody>  
+                {% for message in test_case.messages %}  
+                <tr>  
+                    <td>{{ message.role.title() }}</td>  
+                    <td><pre>{{ message.content }}</pre></td>  
+                </tr>  
+                {% endfor %}  
+            </tbody>  
+        </table>  
+    </div>  
+</div>  
