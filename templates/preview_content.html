@@ -3,15 +3,21 @@
 {% for test_case in test_case_results %}  
 <h2>Deployment: {{ test_case.deployment_name }}</h2>  
   
-<h4>System Prompt Template Used:</h4>  
-<pre>{{ test_case.system_prompt_template }}</pre>  
+<!-- Display the system prompt with context -->  
+<h4>System Prompt:</h4>  
+<pre>{{ test_case.messages[0].content }}</pre>  
   
-<h4>User Prompt Template Used:</h4>  
-<pre>{{ test_case.user_prompt_template }}</pre>  
+<!-- Display the user prompt -->  
+<h4>User Prompt:</h4>  
+<pre>{{ test_case.messages[1].content }}</pre>  
   
-<h4>Response Criteria Used:</h4>  
+<!-- Response Criteria (if applicable) -->  
+{% if test_case.response_criteria %}  
+<h4>Response Criteria:</h4>  
 <pre>{{ test_case.response_criteria }}</pre>  
+{% endif %}  
   
+<!-- Test Case Details -->  
 <h4>Test Case Details</h4>  
 <table>  
     <tr>  
@@ -34,32 +40,46 @@
     {% endfor %}  
 </table>  
   
+<!-- Context Documents Retrieved from MongoDB -->  
 <h4><button type="button" class="collapsible">Context Documents Retrieved from MongoDB</button></h4>  
 <div class="content">  
+    {% if test_case.context_docs %}  
     <div class="table-responsive">  
         <table>  
             <thead>  
                 <tr>  
+                    {% if test_case.context_docs[0]['score'] is defined %}  
                     <th>Score</th>  
-                    <th>Title</th>  
-                    <th>Year</th>  
-                    <th>Plot</th>  
+                    {% endif %}  
+                    {% for key in test_case.context_docs[0].keys() %}  
+                    {% if key != 'score' %}  
+                    <th>{{ key|capitalize }}</th>  
+                    {% endif %}  
+                    {% endfor %}  
                 </tr>  
             </thead>  
             <tbody>  
                 {% for doc in test_case.context_docs %}  
                 <tr>  
-                    <td>{{ "%.4f"|format(doc.score) }}</td>  
-                    <td>{{ doc.title }}</td>  
-                    <td>{{ doc.year }}</td>  
-                    <td>{{ doc.plot }}</td>  
+                    {% if doc['score'] is defined %}  
+                    <td>{{ "%.4f"|format(doc['score']) }}</td>  
+                    {% endif %}  
+                    {% for key, value in doc.items() %}  
+                    {% if key != 'score' %}  
+                    <td>{{ value }}</td>  
+                    {% endif %}  
+                    {% endfor %}  
                 </tr>  
                 {% endfor %}  
             </tbody>  
         </table>  
     </div>  
+    {% else %}  
+    <p>No context documents retrieved.</p>  
+    {% endif %}  
 </div>  
   
+<!-- Messages Sent to Azure Client -->  
 <h4><button type="button" class="collapsible">Messages Sent to Azure Client</button></h4>  
 <div class="content">  
     <div class="table-responsive">  

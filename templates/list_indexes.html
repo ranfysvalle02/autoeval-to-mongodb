@@ -1,0 +1,404 @@
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>Manage Atlas Search Indexes</title>  
+    <!-- Include Google Fonts -->  
+    <link rel="preconnect" href="https://fonts.googleapis.com">  
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">  
+    <!-- Include Font Awesome for Icons -->  
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>  
+    <!-- Embedded CSS Styles -->  
+    <style>  
+        /* Global Styles */  
+        body {  
+            margin: 0;  
+            font-family: 'Roboto', sans-serif;  
+            background-color: #f5f7fa;  
+            color: #333;  
+        }  
+  
+        header, footer {  
+            background-color: #2c3e50;  
+            color: white;  
+            padding: 1em 0;  
+            text-align: center;  
+            position: sticky;  
+            top: 0;  
+            z-index: 1000;  
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);  
+        }  
+  
+        header h1 {  
+            margin: 0;  
+            font-weight: normal;  
+        }  
+  
+        main {  
+            padding: 2em;  
+            max-width: 1200px;  
+            margin: 0 auto;  
+        }  
+  
+        h2 {  
+            color: #2c3e50;  
+            margin-top: 1.5em;  
+        }  
+  
+        h3 {  
+            color: #34495e;  
+            margin-top: 1em;  
+        }  
+  
+        a {  
+            color: #3498db;  
+            text-decoration: none;  
+        }  
+  
+        a:hover {  
+            text-decoration: underline;  
+        }  
+  
+        /* Navigation Styles */  
+        nav {  
+            background-color: #34495e;  
+            padding: 0.5em 0;  
+        }  
+  
+        nav ul {  
+            list-style-type: none;  
+            margin: 0;  
+            padding: 0;  
+            text-align: center;  
+        }  
+  
+        nav ul li {  
+            display: inline-block;  
+            margin: 0 1em;  
+        }  
+  
+        nav ul li a {  
+            color: white;  
+            font-weight: bold;  
+        }  
+  
+        nav ul li a:hover {  
+            text-decoration: underline;  
+        }  
+  
+        /* Table Styles */  
+        table {  
+            width: 100%;  
+            border-collapse: collapse;  
+            margin-top: 1em;  
+        }  
+  
+        table th, table td {  
+            border: 1px solid #ddd;  
+            padding: 0.5em;  
+            vertical-align: top;  
+        }  
+  
+        table th {  
+            background-color: #f2f2f2;  
+            text-align: left;  
+        }  
+  
+        pre {  
+            background-color: #f9f9f9;  
+            padding: 0.5em;  
+            border-radius: 4px;  
+            overflow-x: auto;  
+            max-width: 100%;  
+        }  
+  
+        /* Accordion Styles */  
+        .accordion {  
+            margin-bottom: 1em;  
+        }  
+  
+        .accordion .accordion-header {  
+            background-color: #f1f1f1;  
+            cursor: pointer;  
+            padding: 0.75em 1em;  
+            border: 1px solid #ddd;  
+            border-radius: 4px;  
+            margin-top: 0.5em;  
+            font-weight: bold;  
+        }  
+  
+        .accordion .accordion-content {  
+            display: none;  
+            padding: 0.5em 1em;  
+            border-left: 1px solid #ddd;  
+            border-right: 1px solid #ddd;  
+            border-bottom: 1px solid #ddd;  
+        }  
+  
+        .accordion .active + .accordion-content {  
+            display: block;  
+        }  
+  
+        /* Button Styles */  
+        .btn {  
+            display: inline-block;  
+            padding: 0.5em 1em;  
+            margin: 0.2em 0;  
+            background-color: #3498db;  
+            color: white;  
+            border: none;  
+            border-radius: 4px;  
+            cursor: pointer;  
+            transition: background-color 0.3s ease, transform 0.1s ease;  
+            text-decoration: none;  
+            text-align: center;  
+        }  
+  
+        .btn:hover {  
+            background-color: #2980b9;  
+            transform: translateY(-2px);  
+        }  
+  
+        .error {  
+            color: #e74c3c;  
+            margin: 1em 0;  
+        }  
+  
+        .success {  
+            color: #27ae60;  
+            margin: 1em 0;  
+        }  
+  
+        .form-group {  
+            margin-bottom: 1em;  
+        }  
+  
+        .form-group label {  
+            display: block;  
+            font-weight: bold;  
+            margin-bottom: 0.5em;  
+        }  
+  
+        .form-group input[type="text"],  
+        .form-group textarea,  
+        .form-group select {  
+            width: 100%;  
+            padding: 0.75em;  
+            border: 1px solid #ccd1d9;  
+            border-radius: 4px;  
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;  
+            font-size: 1em;  
+        }  
+  
+        .form-group input[type="text"]:focus,  
+        .form-group textarea:focus,  
+        .form-group select:focus {  
+            border-color: #3498db;  
+            box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1);  
+            outline: none;  
+        }  
+  
+        .form-group textarea {  
+            resize: vertical;  
+        }  
+  
+        .form-actions {  
+            margin-top: 1em;  
+        }  
+  
+        /* Responsive Design */  
+        @media (max-width: 768px) {  
+            main {  
+                padding: 1em;  
+            }  
+  
+            table th, table td {  
+                padding: 0.5em;  
+            }  
+        }  
+    </style>  
+</head>  
+<body>  
+    <header>  
+        <h1>Manage Atlas Search Indexes</h1>  
+    </header>  
+  
+    <!-- Navigation Menu -->  
+    <nav>  
+        <ul>  
+            <li><a href="{{ url_for('index') }}">Home</a></li>  
+            <li><a href="{{ url_for('list_indexes') }}">Manage Atlas Search Indexes</a></li>  
+            <!-- Add more navigation items if needed -->  
+        </ul>  
+    </nav>  
+  
+    <main>  
+        {% if error_message %}  
+            <p class="error">{{ error_message }}</p>  
+        {% endif %}  
+        {% if success_message %}  
+            <p class="success">{{ success_message }}</p>  
+        {% endif %}  
+  
+        <h2>Create New Index</h2>  
+        <form method="post" action="{{ url_for('list_indexes') }}">  
+            <input type="hidden" name="action" value="create_index">  
+            <div class="form-group">  
+                <label for="db_name">Database:</label>  
+                <select id="db_name" name="db_name" required>  
+                    <option value="">-- Select Database --</option>  
+                    {% for db in databases %}  
+                        <option value="{{ db.name }}">{{ db.name }}</option>  
+                    {% endfor %}  
+                </select>  
+            </div>  
+            <div class="form-group">  
+                <label for="collection_name">Collection:</label>  
+                <select id="collection_name" name="collection_name" required>  
+                    <option value="">-- Select Collection --</option>  
+                    <!-- Options will be populated via JavaScript -->  
+                </select>  
+            </div>  
+            <div class="form-group">  
+                <label for="index_name">Index Name:</label>  
+                <input type="text" id="index_name" name="index_name" required>  
+            </div>  
+            <div class="form-group">  
+                <label for="source_field">Source Field:</label>  
+                <select id="source_field" name="source_field" required>  
+                    <option value="">-- Select Source Field --</option>  
+                    <!-- Options will be populated via JavaScript -->  
+                </select>  
+            </div>  
+            <div class="form-group">  
+                <label for="embedding_field">Embedding Field (to store embeddings):</label>  
+                <input type="text" id="embedding_field" name="embedding_field" required placeholder="Enter new or existing field name">  
+            </div>  
+            <!-- We default to cosine similarity and do not expose it to the user -->  
+            <div class="form-actions">  
+                <button type="submit" class="btn">Create Index</button>  
+            </div>  
+        </form>  
+  
+        {% if databases %}  
+            {% for db in databases %}  
+                <section class="database-section">  
+                    <h2>Database: {{ db.name }}</h2>  
+                    {% if db.collections %}  
+                        {% for collection in db.collections %}  
+                            <div class="accordion">  
+                                <div class="accordion-header" onclick="toggleAccordion(this)">  
+                                    Collection: {{ collection.name }}  
+                                </div>  
+                                <div class="accordion-content">  
+                                    {% if collection.indexes %}  
+                                        <table>  
+                                            <thead>  
+                                                <tr>  
+                                                    <th>Index Name</th>  
+                                                    <th>Embedding Field</th>  
+                                                    <th>Status</th>  
+                                                </tr>  
+                                            </thead>  
+                                            <tbody>  
+                                                {% for index in collection.indexes %}  
+                                                    <tr>  
+                                                        <td>{{ index['name'] }}</td>  
+                                                        <td>{{ index['embedding_field'] }}</td>  
+                                                        <td>{{ index['status'] }}</td>  
+                                                    </tr>  
+                                                {% endfor %}  
+                                            </tbody>  
+                                        </table>  
+                                    {% else %}  
+                                        <p>No Atlas Search indexes found in this collection.</p>  
+                                    {% endif %}  
+                                </div>  
+                            </div>  
+                        {% endfor %}  
+                    {% else %}  
+                        <p>No collections found in this database.</p>  
+                    {% endif %}  
+                </section>  
+            {% endfor %}  
+        {% else %}  
+            <p>No databases found.</p>  
+        {% endif %}  
+    </main>  
+  
+    <footer>  
+        <p>&copy; {{ current_year }} Your Company Name</p>  
+    </footer>  
+  
+    <!-- JavaScript for Accordion and Dynamic Collection Loading -->  
+    <script>  
+        function toggleAccordion(element) {  
+            element.classList.toggle("active");  
+            var content = element.nextElementSibling;  
+            if (content.style.display === "block") {  
+                content.style.display = "none";  
+            } else {  
+                content.style.display = "block";  
+            }  
+        }  
+  
+        // Create a mapping of databases to their collections  
+        var dbCollections = {};  
+        {% for db in databases %}  
+            dbCollections["{{ db.name }}"] = [  
+                {% for collection in db.collections %}  
+                    "{{ collection.name }}"{% if not loop.last %},{% endif %}  
+                {% endfor %}  
+            ];  
+        {% endfor %}  
+  
+        // Create a mapping of collection to their fields  
+        var collectionFields = {};  
+        {% for db in databases %}  
+            {% for collection in db.collections %}  
+                collectionFields["{{ db.name }}.{{ collection.name }}"] = [  
+                    {% for field in collection.fields %}  
+                        "{{ field }}"{% if not loop.last %},{% endif %}  
+                    {% endfor %}  
+                ];  
+            {% endfor %}  
+        {% endfor %}  
+  
+        // JavaScript to populate collections based on selected database  
+        document.getElementById('db_name').addEventListener('change', function() {  
+            var dbName = this.value;  
+            var collectionSelect = document.getElementById('collection_name');  
+            var sourceFieldSelect = document.getElementById('source_field');  
+            collectionSelect.innerHTML = '<option value="">-- Select Collection --</option>';  
+            sourceFieldSelect.innerHTML = '<option value="">-- Select Source Field --</option>';  
+            if (dbName !== '') {  
+                var collections = dbCollections[dbName] || [];  
+                collections.forEach(function(collectionName) {  
+                    var option = document.createElement('option');  
+                    option.value = collectionName;  
+                    option.text = collectionName;  
+                    collectionSelect.add(option);  
+                });  
+            }  
+        });  
+  
+        // Populate fields based on selected collection  
+        document.getElementById('collection_name').addEventListener('change', function() {  
+            var dbName = document.getElementById('db_name').value;  
+            var collectionName = this.value;  
+            var sourceFieldSelect = document.getElementById('source_field');  
+            sourceFieldSelect.innerHTML = '<option value="">-- Select Source Field --</option>';  
+            if (dbName !== '' && collectionName !== '') {  
+                var key = dbName + '.' + collectionName;  
+                var fields = collectionFields[key] || [];  
+                fields.forEach(function(fieldName) {  
+                    var option = document.createElement('option');  
+                    option.value = fieldName;  
+                    option.text = fieldName;  
+                    sourceFieldSelect.add(option);  
+                });  
+            }  
+        });  
+    </script>  
+</body>  
+</html>  

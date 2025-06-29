@@ -1,17 +1,38 @@
-from flask import Flask, request, render_template, redirect, url_for, session  
+from flask import Flask, request, render_template, redirect, url_for, session, jsonify  
 import os  
 import sys  
 import copy  
+from typing import Optional  
 from pymongo import MongoClient  
-from autoevals import Factuality, LLMClassifier, init  
-from openai import AzureOpenAI  
+from pymongo.errors import PyMongoError, OperationFailure  
+import pymongo  # For bulk operations and SearchIndexModel  
+from pymongo.operations import SearchIndexModel  
 import json  
-from datetime import datetime  
+import datetime  
 from dotenv import load_dotenv  
 from bson.objectid import ObjectId  
-import time  # For timing  
-from autoevals.ragas import ContextRelevancy, Faithfulness  # Import new evaluators  
-  
+import time  
+import bson
+
+def bson_serializer(obj):  
+    if isinstance(obj, datetime.datetime):  
+        return obj.isoformat()  
+    elif isinstance(obj, datetime.date):  
+        return obj.isoformat()  
+    elif isinstance(obj, datetime.time):  
+        return obj.isoformat()  
+    elif isinstance(obj, ObjectId):  
+        return str(obj)  
+    elif isinstance(obj, bytes):  
+        try:  
+            return obj.decode('utf-8')  
+        except UnicodeDecodeError:  
+            return repr(obj)  
+    elif isinstance(obj, decimal.Decimal):  
+        return float(obj)  
+    else:  
+        return str(obj)  
+
 # --- Configuration ---  
 # Load environment variables  
 load_dotenv()  
@@ -47,13 +68,12 @@ try:
     if not AZURE_ENDPOINT or not AZURE_API_KEY:  
         raise ValueError("Azure endpoint or API key is not configured. Please set the environment variables.")  
   
+    from openai import AzureOpenAI  
     azure_client = AzureOpenAI(  
         api_version=AZURE_API_VERSION,  
         azure_endpoint=AZURE_ENDPOINT,  
         api_key=AZURE_API_KEY,  
     )  
-    # Initialize autoevals with the client  
-    init(azure_client)  
     print("Successfully initialized AzureOpenAI client.")  
 except Exception as e:  
     print(f"Fatal Error: Could not initialize AzureOpenAI client. Check your configuration. Details: {e}",  
@@ -73,7 +93,7 @@ if MONGO_URI:
         sys.exit(1)  
 else:  
     print(  
-        "Warning: MONGO_URI is not set. The RAG task will not be able to query the database.",  
+        "Warning: MONGO_URI is not set. The application will not be able to query the database.",  
         file=sys.stderr,  
     )  
   
@@ -87,7 +107,14 @@ def exact_match(output, expected, **kwargs):
     return type('Result', (object,), {'score': score, 'reason': reason, 'metadata': metadata})  
   
 # Initialize instances of metric evaluators  
+from autoevals import Factuality, LLMClassifier, init  
+from autoevals.ragas import ContextRelevancy, Faithfulness  
+  
+# Initialize autoevals with the Azure client  
+init(azure_client)  
+  
 factuality_evaluator = Factuality(client=azure_client)  # Pass the Azure client  
+  
 kid_friendly_classifier = LLMClassifier(  
     name="Kid-Friendly Movie Classifier",  
     prompt_template=(  
@@ -127,53 +154,57 @@ METRICS = {
   
 # --- Helper Functions for RAG ---  
   
-def get_embedding(text: str, model: str = AZURE_EMBEDDING_DEPLOYMENT_NAME) -> list:  
+def get_embedding(text: str, model_deployment_name: str = AZURE_EMBEDDING_DEPLOYMENT_NAME) -> Optional[list]:  
     """Generates a vector embedding for a given text using Azure OpenAI."""  
     if not azure_client:  
         raise ValueError("Azure client is not initialized.")  
     try:  
-        response = azure_client.embeddings.create(input=[text], model=model)  
+        response = azure_client.embeddings.create(input=[text], model=model_deployment_name)  
         return response.data[0].embedding  
     except Exception as e:  
         print(f"Error generating embedding: {e}", file=sys.stderr)  
-        return []  
+        return None  
   
-def perform_vector_search(vector: list) -> list:  
+def perform_vector_search(vector: list, db_name: str, collection_name: str, index_name: str, vector_field: str) -> list:  
     """  
-    Performs a $vectorSearch query in MongoDB to find relevant documents.  
+    Performs a $search query in MongoDB to find relevant documents.  
     """  
     if not mongo_client:  
         print("Cannot perform vector search, MongoDB client not initialized.", file=sys.stderr)  
         return []  
   
+    # Build the vector search pipeline  
     pipeline = [  
         {  
             "$vectorSearch": {  
-                "index": "embeddings_1_search_index",  
-                "path": "plot_embedding",  # The field in your documents that contains the vector  
+                "index": index_name,  
                 "queryVector": vector,  
-                "numCandidates": 200,  # Number of candidates to consider  
-                "limit": 5,            # Number of results to return  
+                "path": vector_field,  
+                "limit": 10,          # Limit the number of results
+                "k": 5,                  # Number of nearest neighbors to retrieve  
+                "numCandidates": 100      # Number of candidates to consider (adjust as needed)  
             }  
         },  
         {  
             "$project": {  
                 "_id": 0,  
-                "score": {"$meta": "vectorSearchScore"},  
-                "title": 1,  
-                "plot": 1,  
-                "year": 1,  
+                vector_field: 0,          # Exclude the embedding field  
+                "score": {"$meta": "vectorSearchScore"}  
             }  
         },  
     ]  
+  
     try:  
-        results = list(mongo_client["sample_mflix"]["embedded_movies"].aggregate(pipeline))  
+        collection = mongo_client[db_name][collection_name]  
+  
+        results = list(collection.aggregate(pipeline))  
         return results  
     except Exception as e:  
         print(f"Error during vector search in MongoDB: {e}", file=sys.stderr)  
         return []  
   
-def run_rag_task(input_prompt: str, deployment_name: str, response_criteria: str, system_prompt_template: str, user_prompt_template: str):  
+def run_rag_task(input_prompt: str, deployment_name: str, response_criteria: str, system_prompt_template: str, user_prompt_template: str,  
+                 db_name: str, collection_name: str, index_name: str, vector_field: str):  
     """  
     Executes the full Retrieval-Augmented Generation (RAG) task:  
     1. Generates an embedding for the input.  
@@ -194,16 +225,16 @@ def run_rag_task(input_prompt: str, deployment_name: str, response_criteria: str
   
     # 2. Query MongoDB for context  
     print("Performing vector search in MongoDB...")  
-    context_docs = perform_vector_search(query_vector)  
+    context_docs = perform_vector_search(query_vector, db_name, collection_name, index_name, vector_field)  
     if not context_docs:  
         print("No context found from vector search.", file=sys.stderr)  
         # Fallback: provide default context or handle as needed  
         context_str = "No specific context was found."  
     else:  
         print(f"Retrieved {len(context_docs)} documents from MongoDB.")  
-        # Format the context for the prompt  
-        context_str = "\n".join(  
-            [f"- {doc['title']} ({doc['year']})\n\n{doc['plot']}" for doc in context_docs]  
+        # Dynamically format the context for the prompt  
+        context_str = "\n".join(    
+            [json.dumps(doc, default=bson_serializer, indent=2) for doc in context_docs]    
         )  
   
     # 3. Generate response from the chat model with the retrieved context  
@@ -235,34 +266,8 @@ def run_rag_task(input_prompt: str, deployment_name: str, response_criteria: str
         print(f"An unexpected error occurred during chat completion: {e}", file=sys.stderr)  
         return "", [], context_docs  # Return empty response and messages on error, but pass context_docs  
   
-# Test Dataset  
-TEST_DATASET = [  
-    {  
-        "id": 1,  
-        "input": "A boy befriends a giant robot from outer space. \nWhat is the movie?",  
-        "expected": "The Iron Giant"  
-    },  
-    {  
-        "id": 2,  
-        "input": "An 8-year-old boy genius and his friends must rescue their parents. \nWhat is the movie?",  
-        "expected": "Jimmy Neutron: Boy Genius"  
-    },  
-    {  
-        "id": 3,  
-        "input": "An isolated research facility becomes the battleground as a trio of intelligent sharks fight back. \nWhat is the movie?",  
-        "expected": "Deep Blue Sea"  
-    },  
-    {  
-        "id": 4,  
-        "input": "A hacker has to choose between a red pill and a blue pill to see the true nature of reality. \nWhat is the movie?",  
-        "expected": "The Matrix"  
-    },  
-    {  
-        "id": 5,  
-        "input": "When two kids find and play a magical board game, they release a man trapped for decades and a host of dangers that can only be stopped by finishing the game. \nWhat is the movie?",  
-        "expected": "Jumanji"  
-    },  
-]  
+# Start with an empty test dataset  
+TEST_DATASET = []  
   
 def get_test_dataset_from_form(form_data):  
     """Extract test cases from form data."""  
@@ -280,10 +285,11 @@ def get_test_dataset_from_form(form_data):
             test_dataset.append(test_case)  
     return test_dataset  
   
-def test_rag_task_with_metrics(test_dataset, deployment_names, response_criteria, system_prompt_template, user_prompt_template, selected_metrics):  
+def test_rag_task_with_metrics(test_dataset, deployment_names, response_criteria, system_prompt_template, user_prompt_template, selected_metrics,  
+                               db_name, collection_name, index_name, vector_field):  
     """Runs the RAG task on test data for multiple deployment names, evaluates selected metrics, and returns the results."""  
     test_run = {  
-        "timestamp": datetime.utcnow().isoformat(),  
+        "timestamp": datetime.datetime.utcnow().isoformat(),  
         "deployment_names": deployment_names,  # Note the plural key  
         "response_criteria": response_criteria,  
         "system_prompt_template": system_prompt_template,  
@@ -292,6 +298,10 @@ def test_rag_task_with_metrics(test_dataset, deployment_names, response_criteria
         "test_cases": [],  # We'll store results here  
         "models": {},  # Store results per model  
         "total_duration_seconds": 0,  
+        "db_name": db_name,  
+        "collection_name": collection_name,  
+        "index_name": index_name,  
+        "vector_field": vector_field,  
     }  
   
     # Start overall timing  
@@ -315,13 +325,17 @@ def test_rag_task_with_metrics(test_dataset, deployment_names, response_criteria
                 deployment_name,  
                 response_criteria,  
                 system_prompt_template,  
-                user_prompt_template  
+                user_prompt_template,  
+                db_name,  
+                collection_name,  
+                index_name,  
+                vector_field  
             )  
   
             # Reconstruct context_str from context_docs  
             if context_docs:  
                 context_str = "\n".join(  
-                    [f"- {doc['title']} ({doc['year']})\n\n{doc['plot']}" for doc in context_docs]  
+                    [json.dumps(doc, default=bson_serializer, indent=2) for doc in context_docs]  
                 )  
             else:  
                 context_str = "No specific context was found."  
@@ -433,6 +447,208 @@ def test_rag_task_with_metrics(test_dataset, deployment_names, response_criteria
   
     return test_run  
   
+# --- Helper Functions to List and Manage Databases, Collections, Fields, and Atlas Search Indexes ---  
+  
+def get_databases():  
+    """Retrieve a list of databases with collections, fields, and indexes."""  
+    try:  
+        db_names = mongo_client.list_database_names()  
+        databases_info = []  
+        for db_name in db_names:  
+            if db_name in ('admin', 'local', 'config'):  
+                continue  
+            db_info = {  
+                'name': db_name,  
+                'collections': []  
+            }  
+            collections = get_collections(db_name)  
+            for collection_name in collections:  
+                fields = get_collection_fields(db_name, collection_name)  
+                indexes = get_atlas_search_indexes(db_name, collection_name)  
+                collection_info = {  
+                    'name': collection_name,  
+                    'fields': fields,  
+                    'indexes': indexes  
+                }  
+                db_info['collections'].append(collection_info)  
+            databases_info.append(db_info)  
+        return databases_info  
+    except PyMongoError as e:  
+        print(f"Error listing databases: {e}", file=sys.stderr)  
+        return []  
+  
+def get_collections(db_name):  
+    """Retrieve a list of collection names from a given database."""  
+    try:  
+        db = mongo_client[db_name]  
+        return db.list_collection_names()  
+    except PyMongoError as e:  
+        print(f"Error listing collections for database {db_name}: {e}", file=sys.stderr)  
+        return []  
+  
+def get_collection_fields(db_name, collection_name):  
+    """Retrieve a list of field names from a collection's sample documents."""  
+    try:  
+        collection = mongo_client[db_name][collection_name]  
+        fields = set()  
+        cursor = collection.find({}, limit=100)  
+        for sample_doc in cursor:  
+            recursive_extract_fields(sample_doc, fields)  
+        return list(fields)  
+    except Exception as e:  
+        print(f"Error fetching fields from {db_name}.{collection_name}: {e}", file=sys.stderr)  
+        return []  
+  
+def recursive_extract_fields(document, fields, parent_prefix=''):  
+    """Recursively extract field names from nested documents."""  
+    for key, value in document.items():  
+        field_full_name = f"{parent_prefix}.{key}" if parent_prefix else key  
+        fields.add(field_full_name)  
+        if isinstance(value, dict):  
+            recursive_extract_fields(value, fields, field_full_name)  
+  
+def get_atlas_search_indexes(db_name, collection_name):  
+    """Retrieve Atlas Search indexes for a given collection."""  
+    try:  
+        collection = mongo_client[db_name][collection_name]  
+        indexes = collection.list_search_indexes()  
+        index_info_list = []  
+        for index in indexes:  
+            index_info = {  
+                'name': index.get('name', ''),  
+                'status': index.get('status', ''),  
+                'embedding_field': ''  
+            }  
+            definition = index.get('definition', {})  
+            mappings = definition.get('mappings', {})  
+            fields = mappings.get('fields', {})  
+            for field_name, field_info in fields.items():  
+                if field_info.get('type') == 'knnVector':  
+                    index_info['embedding_field'] = field_name  
+                    break  
+            index_info_list.append(index_info)  
+        return index_info_list  
+    except PyMongoError as e:  
+        print(f"Error listing search indexes for {db_name}.{collection_name}: {e}", file=sys.stderr)  
+        return []  
+    except AttributeError:  
+        print("The 'list_search_indexes' method requires PyMongo 4.8 or higher.", file=sys.stderr)  
+        return []  
+  
+def create_embedding_search_index(db_name, collection_name, index_name, embedding_field):  
+    """Create a new Atlas Search index for the specified embedding field."""  
+    try:  
+        collection = mongo_client[db_name][collection_name]  
+  
+        existing_indexes = collection.list_search_indexes()  
+        for index in existing_indexes:  
+            if index.get('name') == index_name:  
+                raise ValueError(f"An index with the name '{index_name}' already exists.")  
+  
+        # Fetch a sample document to determine the number of dimensions  
+        sample_doc = collection.find_one({embedding_field: {'$exists': True, '$ne': None}})  
+        if not sample_doc:  
+            raise ValueError(f"No documents found with the embedding field '{embedding_field}'.")  
+        embedding_vector = get_value_from_field(sample_doc, embedding_field)  
+        if not isinstance(embedding_vector, list):  
+            raise ValueError(f"The field '{embedding_field}' is not a list in the sample document.")  
+        num_dimensions = len(embedding_vector)  
+  
+        search_index_model = SearchIndexModel(  
+            definition={  
+                "mappings": {  
+                    "dynamic": False,  
+                    "fields": {  
+                        str(embedding_field): {  
+                            "type": "knnVector",  
+                            "dimensions": num_dimensions,  
+                            "similarity": "cosine"  
+                        }  
+                    }  
+                }  
+            },  
+            name=index_name  
+        )  
+  
+        collection.create_search_index(search_index_model)  
+  
+        print(f"Index '{index_name}' creation initiated.")  
+        return True  
+    except Exception as e:  
+        print(f"Error creating search index {index_name} for {db_name}.{collection_name}: {e}", file=sys.stderr)  
+        return False  
+  
+def generate_embeddings_for_collection(db_name, collection_name, source_field, embedding_field):  
+    """Generates embeddings for documents in a collection based on the source field and stores them in the embedding field."""  
+    collection = mongo_client[db_name][collection_name]  
+  
+    documents_to_update = collection.find(  
+        {  
+            source_field: {'$exists': True, '$ne': None},  
+            embedding_field: {'$exists': False}  
+        },  
+        {source_field: 1}  
+    )  
+  
+    total_docs = collection.count_documents(  
+        {  
+            source_field: {'$exists': True, '$ne': None},  
+            embedding_field: {'$exists': False}  
+        }  
+    )  
+  
+    print(f"Generating embeddings for {total_docs} documents in {db_name}.{collection_name}...")  
+  
+    batch_size = 100  
+    documents = []  
+    processed_docs = 0  
+    for doc in documents_to_update:  
+        documents.append(doc)  
+        if len(documents) >= batch_size:  
+            process_documents(documents, collection, source_field, embedding_field)  
+            processed_docs += len(documents)  
+            print(f"Processed {processed_docs}/{total_docs} documents.")  
+            documents = []  
+    if documents:  
+        process_documents(documents, collection, source_field, embedding_field)  
+        processed_docs += len(documents)  
+        print(f"Processed {processed_docs}/{total_docs} documents.")  
+  
+def process_documents(documents, collection, source_field, embedding_field):  
+    bulk_ops = []  
+    for doc in documents:  
+        text_to_embed = get_value_from_field(doc, source_field)  
+        if text_to_embed and isinstance(text_to_embed, str):  
+            embedding = get_embedding(text_to_embed)  
+            if embedding:  
+                bulk_ops.append(  
+                    pymongo.UpdateOne(  
+                        {'_id': doc['_id']},  
+                        {'$set': {embedding_field: embedding}}  
+                    )  
+                )  
+            else:  
+                print(f"Failed to generate embedding for document with _id: {doc['_id']}", file=sys.stderr)  
+        else:  
+            print(f"No valid text to embed for document with _id: {doc['_id']}", file=sys.stderr)  
+    if bulk_ops:  
+        try:  
+            result = collection.bulk_write(bulk_ops)  
+            print(f"Updated {result.matched_count} documents.")  
+        except Exception as e:  
+            print(f"Error during bulk update: {e}", file=sys.stderr)  
+  
+def get_value_from_field(document, field_name):  
+    """Get the value from the nested field in the document."""  
+    fields = field_name.split('.')  
+    value = document  
+    for field in fields:  
+        if isinstance(value, dict) and field in value:  
+            value = value[field]  
+        else:  
+            return None  
+    return value  
+  
 # --- Flask Routes ---  
   
 @app.route('/', methods=['GET'])  
@@ -466,14 +682,14 @@ def index():
     default_response_criteria = """  
 - Provide a concise answer to the question based ONLY on the context.  
 - Respond ONLY with the complete title of the movie that best matches the question.  
-    """  
+    """.strip()  
     default_system_prompt = """  
 Below is the context, which includes plots of movies.  
   
 [context]  
 {context}  
 [/context]  
-    """  
+    """.strip()  
     default_user_prompt = """  
 [response_criteria]  
 {response_criteria}  
@@ -482,10 +698,15 @@ Below is the context, which includes plots of movies.
 [question]  
 {question}  
 [/question]  
-    """  
+    """.strip()  
   
     # Prepare the list of available metrics and mark Factuality as selected by default  
     available_metrics = [{'name': name, 'selected': (name == 'Factuality')} for name in METRICS.keys()]  
+  
+    # Fetch the list of databases for selection  
+    databases_info = get_databases()  
+  
+    current_year = datetime.datetime.utcnow().year  # Pass current_year to template  
   
     return render_template(  
         'index.html',  
@@ -493,12 +714,48 @@ Below is the context, which includes plots of movies.
         deployment_names=DEPLOYMENT_NAMES,  
         default_deployment=DEFAULT_DEPLOYMENT_NAME,  
         previous_runs=previous_runs,  
-        default_response_criteria=default_response_criteria.strip(),  
-        default_system_prompt=default_system_prompt.strip(),  
-        default_user_prompt=default_user_prompt.strip(),  
-        current_year=datetime.utcnow().year,  # Pass current_year to template  
-        available_metrics=available_metrics  
+        default_response_criteria=default_response_criteria,  
+        default_system_prompt=default_system_prompt,  
+        default_user_prompt=default_user_prompt,  
+        current_year=current_year,  
+        available_metrics=available_metrics,  
+        databases=databases_info  # Use databases_info which includes collections and embedding fields  
     )  
+  
+@app.route('/get_collections', methods=['POST'])  
+def get_collections_route():  
+    db_name = request.form.get('db_name')  
+    collections = get_collections(db_name)  
+    # Return collections as a list of dicts with 'name' key  
+    collections_info = [{'name': coll_name} for coll_name in collections]  
+    return jsonify({'collections': collections_info})  # Adjusted  
+  
+@app.route('/get_indexes', methods=['POST'])  
+def get_indexes_route():  
+    db_name = request.form.get('db_name')  
+    collection_name = request.form.get('collection_name')  
+    indexes = get_atlas_search_indexes(db_name, collection_name)  
+    # Return indexes as a list of dicts with 'name' key  
+    index_names = [{'name': idx['name']} for idx in indexes if 'name' in idx]  
+    return jsonify({'indexes': index_names})  # Adjusted  
+  
+@app.route('/get_vector_fields', methods=['POST'])  
+def get_vector_fields_route():  
+    db_name = request.form.get('db_name')  
+    collection_name = request.form.get('collection_name')  
+    embedding_fields = get_collection_fields(db_name, collection_name)  
+    # Return vector fields as a list of dicts with 'name' key  
+    vector_fields_info = [{'name': field} for field in embedding_fields]  
+    return jsonify({'vector_fields': vector_fields_info})  # Adjusted  
+  
+@app.route('/get_fields', methods=['POST'])  
+def get_fields_route():  
+    db_name = request.form.get('db_name')  
+    collection_name = request.form.get('collection_name')  
+    fields = get_collection_fields(db_name, collection_name)  
+    # Return fields as a list of dicts with 'name' key  
+    fields_info = [{'name': field} for field in fields]  
+    return jsonify({'fields': fields_info})  # Adjusted  
   
 @app.route('/add_test_case', methods=['POST'])  
 def add_test_case():  
@@ -564,6 +821,16 @@ def run_test():
     if not selected_metrics:  
         # Default to Factuality if no metrics are selected  
         selected_metrics = ['Factuality']  
+    # Get MongoDB parameters  
+    db_name = request.form.get('db_name')  
+    collection_name = request.form.get('collection_name')  
+    index_name = request.form.get('index_name')  
+    vector_field = request.form.get('vector_field')  
+  
+    # Check if necessary parameters are provided  
+    if not all([db_name, collection_name, index_name, vector_field]):  
+        return "Error: Database, collection, index name, and vector field must be specified.", 400  
+  
     # Run the test  
     test_run_data = test_rag_task_with_metrics(  
         test_dataset,  
@@ -571,14 +838,18 @@ def run_test():
         response_criteria,  
         system_prompt_template,  
         user_prompt_template,  
-        selected_metrics  
+        selected_metrics,  
+        db_name,  
+        collection_name,  
+        index_name,  
+        vector_field  
     )  
   
     # Save test run data to MongoDB  
     inserted_id = test_runs_collection.insert_one(test_run_data).inserted_id  
     test_run_data['_id'] = inserted_id  # Include the ID for rendering  
   
-    return render_template('test_results.html', test_run=test_run_data, current_year=datetime.utcnow().year)  
+    return render_template('test_results.html', test_run=test_run_data, current_year=datetime.datetime.utcnow().year)  
   
 @app.route('/preview', methods=['POST'])  
 def preview():  
@@ -608,18 +879,28 @@ def preview():
     if not selected_metrics:  
         # Default to Factuality if no metrics are selected  
         selected_metrics = ['Factuality']  
+    # Get MongoDB parameters  
+    db_name = request.form.get('db_name')  
+    collection_name = request.form.get('collection_name')  
+    index_name = request.form.get('index_name')  
+    vector_field = request.form.get('vector_field')  
+  
+    # Check if necessary parameters are provided  
+    if not all([db_name, collection_name, index_name, vector_field]):  
+        return "Error: Database, collection, index name, and vector field must be specified.", 400  
   
     # Now process each selected deployment  
     deployment_results = []  
   
     for deployment_name in deployment_names:  
         generated_output, messages, context_docs = run_rag_task(  
-            input_prompt, deployment_name, response_criteria, system_prompt_template, user_prompt_template)  
+            input_prompt, deployment_name, response_criteria, system_prompt_template, user_prompt_template,  
+            db_name, collection_name, index_name, vector_field)  
   
         # Reconstruct context_str from context_docs  
         if context_docs:  
             context_str = "\n".join(  
-                [f"- {doc['title']} ({doc['year']})\n\n{doc['plot']}" for doc in context_docs]  
+                [json.dumps(doc, default=bson_serializer, indent=2) for doc in context_docs]  
             )  
         else:  
             context_str = "No specific context was found."  
@@ -695,36 +976,13 @@ def preview():
     # Render the template, passing the deployment_results  
     return render_template('preview_content.html', test_case_results=deployment_results)  
   
-@app.route('/test_runs', methods=['GET'])  
-def test_runs():  
-    # Fetch all test runs  
-    runs = list(  
-        test_runs_collection.find(  
-            {},  
-            {  
-                "timestamp": 1,  
-                "deployment_names": 1,  
-                "deployment_name":1, # Include for older test runs  
-                "models": 1,  # Include models to access durations  
-                "average_scores": 1,  
-                "response_criteria": 1,  
-                "system_prompt_template": 1,  
-                "user_prompt_template": 1,  
-                "test_cases.input_prompt": 1,  
-                "selected_metrics": 1,  
-                "total_duration_seconds": 1,  # Include the total duration  
-            }  
-        ).sort("timestamp", -1)  
-    )  
-    return render_template('test_run_list.html', test_runs=runs, current_year=datetime.utcnow().year)  
-  
 @app.route('/test_run/<string:run_id>', methods=['GET'])  
 def view_test_run(run_id):  
     # Retrieve test run data from MongoDB using the run_id  
     test_run = test_runs_collection.find_one({"_id": ObjectId(run_id)})  
     if not test_run:  
         return "Test run not found."  
-    return render_template('test_results.html', test_run=test_run, current_year=datetime.utcnow().year)  
+    return render_template('test_results.html', test_run=test_run, current_year=datetime.datetime.utcnow().year)  
   
 @app.route('/reset', methods=['GET'])  
 def reset():  
@@ -732,6 +990,54 @@ def reset():
     session.pop('test_dataset', None)  
     # Redirect to home, defaults will be loaded  
     return redirect(url_for('index'))  
+  
+# Route to List and Manage Atlas Search Indexes  
+  
+@app.route('/list_indexes', methods=['GET', 'POST'])  
+def list_indexes():  
+    error_message = None  
+    success_message = None  
+  
+    if request.method == 'POST':  
+        action = request.form.get('action')  
+        if action == 'create_index':  
+            # Handle index creation  
+            db_name = request.form.get('db_name')  
+            collection_name = request.form.get('collection_name')  
+            index_name = request.form.get('index_name')  
+            source_field = request.form.get('source_field')  
+            embedding_field = request.form.get('embedding_field')  
+  
+            if not all([db_name, collection_name, index_name, source_field, embedding_field]):  
+                error_message = "All fields are required to create an index."  
+            else:  
+                try:  
+                    # Before creating the index, generate embeddings  
+                    generate_embeddings_for_collection(db_name, collection_name, source_field, embedding_field)  
+  
+                    # Now create the index on the embedding field  
+                    result = create_embedding_search_index(db_name, collection_name, index_name, embedding_field)  
+                    if result:  
+                        success_message = f"Index '{index_name}' created successfully."  
+                    else:  
+                        error_message = f"Failed to create index '{index_name}'."  
+                except ValueError as ve:  
+                    error_message = str(ve)  
+                except Exception as e:  
+                    error_message = f"An error occurred: {e}"  
+  
+    # Fetch databases and their collections and indexes  
+    databases_info = get_databases()  
+  
+    current_year = datetime.datetime.utcnow().year  
+  
+    return render_template(  
+        'list_indexes.html',  
+        databases=databases_info,  
+        current_year=current_year,  
+        error_message=error_message,  
+        success_message=success_message  
+    )  
   
 if __name__ == '__main__':  
     app.run(debug=True)  
