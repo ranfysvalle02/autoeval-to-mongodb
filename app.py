@@ -609,85 +609,91 @@ def preview():
         # Default to Factuality if no metrics are selected  
         selected_metrics = ['Factuality']  
   
-    # We will just run the preview for the first selected deployment name  
-    deployment_name = deployment_names[0]  
+    # Now process each selected deployment  
+    deployment_results = []  
   
-    generated_output, messages, context_docs = run_rag_task(input_prompt, deployment_name, response_criteria, system_prompt_template, user_prompt_template)  
+    for deployment_name in deployment_names:  
+        generated_output, messages, context_docs = run_rag_task(  
+            input_prompt, deployment_name, response_criteria, system_prompt_template, user_prompt_template)  
   
-    # Reconstruct context_str from context_docs  
-    if context_docs:  
-        context_str = "\n".join(  
-            [f"- {doc['title']} ({doc['year']})\n\n{doc['plot']}" for doc in context_docs]  
-        )  
-    else:  
-        context_str = "No specific context was found."  
-  
-    metric_results = {}  
-  
-    for metric_name in selected_metrics:  
-        evaluator = METRICS.get(metric_name)  
-        if not evaluator:  
-            print(f"Evaluator for {metric_name} is not initialized.", file=sys.stderr)  
-            continue  
-  
-        # Prepare inputs for each metric  
-        if callable(evaluator) and not hasattr(evaluator, 'eval'):  
-            # For function-based metrics like exact_match  
-            result = evaluator(  
-                output=generated_output,  
-                expected=expected_output  
+        # Reconstruct context_str from context_docs  
+        if context_docs:  
+            context_str = "\n".join(  
+                [f"- {doc['title']} ({doc['year']})\n\n{doc['plot']}" for doc in context_docs]  
             )  
-        elif hasattr(evaluator, 'eval'):  
-            # For class-based evaluators with an eval method  
-            if metric_name == "Factuality":  
-                # Ensure that 'expected_output' is provided for Factuality evaluation  
-                if not expected_output:  
-                    print(f"Expected output is required for Factuality evaluation in preview.", file=sys.stderr)  
-                    result = type('Result', (object,), {'score': 0, 'reason': 'Expected output is missing.', 'metadata': {}})  
-                else:  
+        else:  
+            context_str = "No specific context was found."  
+  
+        metric_results = {}  
+  
+        for metric_name in selected_metrics:  
+            evaluator = METRICS.get(metric_name)  
+            if not evaluator:  
+                print(f"Evaluator for {metric_name} is not initialized.", file=sys.stderr)  
+                continue  
+  
+            # Prepare inputs for each metric  
+            if callable(evaluator) and not hasattr(evaluator, 'eval'):  
+                # For function-based metrics like exact_match  
+                result = evaluator(  
+                    output=generated_output,  
+                    expected=expected_output  
+                )  
+            elif hasattr(evaluator, 'eval'):  
+                # For class-based evaluators with an eval method  
+                if metric_name == "Factuality":  
+                    # Ensure that 'expected_output' is provided for Factuality evaluation  
+                    if not expected_output:  
+                        print(f"Expected output is required for Factuality evaluation in preview.", file=sys.stderr)  
+                        result = type('Result', (object,), {'score': 0, 'reason': 'Expected output is missing.', 'metadata': {}})  
+                    else:  
+                        result = evaluator.eval(  
+                            input=input_prompt,  
+                            output=generated_output,  
+                            expected=expected_output  
+                        )  
+                elif metric_name == "Kid Friendly":  
+                    result = evaluator.eval(  
+                        output=generated_output  
+                    )  
+                elif metric_name in ("Context Relevancy", "Faithfulness"):  
                     result = evaluator.eval(  
                         input=input_prompt,  
                         output=generated_output,  
-                        expected=expected_output  
+                        context=context_str  
                     )  
-            elif metric_name == "Kid Friendly":  
-                result = evaluator.eval(  
-                    output=generated_output  
-                )  
-            elif metric_name in ("Context Relevancy", "Faithfulness"):  
-                result = evaluator.eval(  
-                    input=input_prompt,  
-                    output=generated_output,  
-                    context=context_str  
-                )  
+                else:  
+                    print(f"Metric {metric_name} is not recognized.", file=sys.stderr)  
+                    continue  
             else:  
-                print(f"Metric {metric_name} is not recognized.", file=sys.stderr)  
+                print(f"Evaluator for {metric_name} is not callable or does not have an eval method.", file=sys.stderr)  
                 continue  
-        else:  
-            print(f"Evaluator for {metric_name} is not callable or does not have an eval method.", file=sys.stderr)  
-            continue  
   
-        # Collect 'score', 'reason', 'metadata'  
-        metric_results[metric_name] = {  
-            'score': result.score,  
-            'reason': getattr(result, 'reason', ''),  
-            'metadata': getattr(result, 'metadata', {}),  
+            # Collect 'score', 'reason', 'metadata'  
+            metric_results[metric_name] = {  
+                'score': result.score,  
+                'reason': getattr(result, 'reason', ''),  
+                'metadata': getattr(result, 'metadata', {}),  
+            }  
+  
+        test_case_result = {  
+            "input_prompt": input_prompt,  
+            "expected_output": expected_output,  
+            "generated_output": generated_output,  
+            "metric_results": metric_results,  
+            "deployment_name": deployment_name,  
+            "response_criteria": response_criteria,  
+            "system_prompt_template": system_prompt_template,  
+            "user_prompt_template": user_prompt_template,  
+            "messages": messages,  # Store the messages  
+            "context_docs": context_docs,  # Include the context documents  
         }  
   
-    test_case_result = {  
-        "input_prompt": input_prompt,  
-        "expected_output": expected_output,  
-        "generated_output": generated_output,  
-        "metric_results": metric_results,  
-        "deployment_name": deployment_name,  
-        "response_criteria": response_criteria,  
-        "system_prompt_template": system_prompt_template,  
-        "user_prompt_template": user_prompt_template,  
-        "messages": messages,  # Store the messages  
-        "context_docs": context_docs,  # Include the context documents  
-    }  
-    # Render only the content  
-    return render_template('preview_content.html', test_case=test_case_result)  
+        # Append result to deployment_results  
+        deployment_results.append(test_case_result)  
+  
+    # Render the template, passing the deployment_results  
+    return render_template('preview_content.html', test_case_results=deployment_results)  
   
 @app.route('/test_runs', methods=['GET'])  
 def test_runs():  

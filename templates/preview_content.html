@@ -1,5 +1,7 @@
 <h3>Test Case Preview</h3>  
-<p><strong>Deployment Name:</strong> {{ test_case.deployment_name }}</p>  
+  
+{% for test_case in test_case_results %}  
+<h2>Deployment: {{ test_case.deployment_name }}</h2>  
   
 <h4>System Prompt Template Used:</h4>  
 <pre>{{ test_case.system_prompt_template }}</pre>  
@@ -79,3 +81,6 @@
         </table>  
     </div>  
 </div>  
+  
+<hr>  
+{% endfor %}  

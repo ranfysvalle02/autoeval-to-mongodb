@@ -642,10 +642,9 @@
                     <thead>  
                         <tr>  
                             <th>Timestamp</th>  
-                            <th>Deployment Names</th>  
+                            <th>Deployment Names (Duration, Tests)</th>  
                             <th>Average Scores</th>  
-                            <th>Duration (s)</th> <!-- Added this column -->  
-                            <th>Test Cases</th>  
+                            <!-- Removed 'Duration' and 'Test Cases' columns -->  
                             <th>Actions</th>  
                         </tr>  
                     </thead>  
@@ -654,35 +653,66 @@
                         <tr>  
                             <td>{{ run.timestamp }}</td>  
                             <td>  
-                                {% for name in run.deployment_names %}  
-                                    {{ name }}<br>  
-                                {% endfor %}  
+                                {% if run.deployment_names %}  
+                                    {% for name in run.deployment_names %}  
+                                        {{ name }}  
+                                        {% set details = [] %}  
+                                        {% if run.models and run.models[name] %}  
+                                            {% if run.models[name]['duration_seconds'] %}  
+                                                {% set _ = details.append('%.2f'|format(run.models[name]['duration_seconds']) ~ ' s') %}  
+                                            {% endif %}  
+                                            {% if run.models[name]['test_cases'] %}  
+                                                {% set num_tests = run.models[name]['test_cases'] | length %}  
+                                                {% set _ = details.append(num_tests|string ~ ' tests') %}  
+                                            {% endif %}  
+                                        {% endif %}  
+                                        {% if details %}  
+                                            ({{ details | join(', ') }})  
+                                        {% endif %}  
+                                        {% if not loop.last %}  
+                                            ,  
+                                        {% endif %}  
+                                    {% endfor %}  
+                                {% else %}  
+                                    {{ run.deployment_name }}  
+                                    {% set details = [] %}  
+                                    {% if run.total_duration_seconds %}  
+                                        {% set _ = details.append('%.2f'|format(run.total_duration_seconds) ~ ' s') %}  
+                                    {% endif %}  
+                                    {% if run.test_cases %}  
+                                        {% set num_tests = run.test_cases | length %}  
+                                        {% set _ = details.append(num_tests|string ~ ' tests') %}  
+                                    {% endif %}  
+                                    {% if details %}  
+                                        ({{ details | join(', ') }})  
+                                    {% endif %}  
+                                {% endif %}  
                             </td>  
                             <td>  
                                 {% if run.models %}  
+                                    <!-- For each model, display its name and average scores -->  
                                     {% for model_name, model_data in run.models.items() %}  
-                                        <strong>{{ model_name }}</strong><br>  
+                                        <strong>{{ model_name }}</strong>:  
                                         {% for metric_name, avg_score in model_data.average_scores.items() %}  
-                                            {{ metric_name }}: {{ "%.2f"|format(avg_score) }}<br>  
+                                            {{ metric_name }}: {{ "%.2f"|format(avg_score) }}  
+                                            {% if not loop.last %}  
+                                                |  
+                                            {% endif %}  
                                         {% endfor %}  
+                                        {% if not loop.last %}  
+                                            <br>  
+                                        {% endif %}  
                                     {% endfor %}  
-                                {% else %}  
+                                {% elif run.average_scores %}  
                                     {% for metric_name, avg_score in run.average_scores.items() %}  
-                                        {{ metric_name }}: {{ "%.2f"|format(avg_score) }}<br>  
+                                        {{ metric_name }}: {{ "%.2f"|format(avg_score) }}  
+                                        {% if not loop.last %}  
+                                            |  
+                                        {% endif %}  
                                     {% endfor %}  
-                                {% endif %}  
-                            </td>  
-                            <td>  
-                                {% if run.total_duration_seconds %}  
-                                    {{ "%.2f"|format(run.total_duration_seconds) }}  
                                 {% else %}  
                                     N/A  
                                 {% endif %}  
-                            </td> <!-- Added duration display -->  
-                            <td>  
-                                {% for case in run.test_cases %}  
-                                    {{ loop.index }}. {{ case.input_prompt | truncate(50) }}<br>  
-                                {% endfor %}  
                             </td>  
                             <td>  
                                 <a href="/test_run/{{ run._id }}" class="btn icon" title="View Results"><i class="fa fa-file-alt"></i></a>  
