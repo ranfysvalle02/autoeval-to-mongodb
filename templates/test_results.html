@@ -199,7 +199,7 @@
   
         .chat-message.user .message-content {  
             background-color: #007bff;  
-            color: #007bff;  
+            color: #fff;  
         }  
   
         .chat-message.assistant .message-content {  
@@ -211,6 +211,8 @@
             margin: 0;  
             white-space: pre-wrap; /* Wrap long lines */  
             word-wrap: break-word;  
+            color: black;
+            font-weight: bold;
         }  
   
         /* Responsive Design */  
@@ -232,13 +234,14 @@
   
     <!-- Embedded JavaScript -->  
     <script>  
-        function openMessagesModal(testCaseId) {  
+        function openMessagesModal(testCaseId, deploymentName) {  
             // Get the modal element  
             var modal = document.getElementById('messagesModal');  
             // Get the content element where messages will be displayed  
             var contentElement = document.getElementById('modalContent');  
             // Get the messages data from the hidden input  
-            var messagesData = document.getElementById('messagesData_' + testCaseId).value;  
+            var messagesDataId = 'messagesData_' + testCaseId + '_' + deploymentName;  
+            var messagesData = document.getElementById(messagesDataId).value;  
             // Parse the messages JSON  
             var messages = JSON.parse(messagesData);  
   
@@ -306,7 +309,7 @@
         <section>  
             <h2>Summary</h2>  
             <p><strong>Timestamp:</strong> {{ test_run.timestamp }}</p>  
-            <p><strong>Deployment Name:</strong> {{ test_run.deployment_name }}</p>  
+            <p><strong>Deployment Names:</strong> {{ test_run.deployment_names | join(", ") }}</p>  
             <p><strong>Number of Test Cases:</strong> {{ test_run.test_cases | length }}</p>  
             <p><strong>Total Duration (s):</strong>  
                 {% if test_run.total_duration_seconds %}  
@@ -315,13 +318,6 @@
                     N/A  
                 {% endif %}  
             </p> <!-- Added duration display -->  
-  
-            <h2>Average Scores per Metric</h2>  
-            <ul>  
-                {% for metric_name, avg_score in test_run.average_scores.items() %}  
-                <li><strong>{{ metric_name }}:</strong> {{ "%.2f"|format(avg_score) }}</li>  
-                {% endfor %}  
-            </ul> 
   
             <div class="prompt-templates">  
                 <h2>System Prompt Template Used:</h2>  
@@ -335,39 +331,48 @@
             </div>  
   
             <h2>Test Cases</h2>  
-            <div class="table-responsive">  
-                <table>  
-                    <thead>  
-                        <tr>  
-                            <th>ID</th>  
-                            <th>Input Prompt</th>  
-                            <th>Expected Output</th>  
-                            <th>Generated Output</th>  
-                            {% for metric_name in test_run.selected_metrics %}  
-                            <th>{{ metric_name }} Score</th>  
+            {% for deployment_name in test_run.deployment_names %}  
+                <h3>Results for Model: {{ deployment_name }}</h3>  
+                <div class="table-responsive">  
+                    <table>  
+                        <thead>  
+                            <tr>  
+                                <th>ID</th>  
+                                <th>Input Prompt</th>  
+                                <th>Expected Output</th>  
+                                <th>Generated Output</th>  
+                                {% for metric_name in test_run.selected_metrics %}  
+                                <th>{{ metric_name }} Score</th>  
+                                {% endfor %}  
+                                <th>Messages</th>  
+                            </tr>  
+                        </thead>  
+                        <tbody>  
+                            {% for case in test_run.models[deployment_name].test_cases %}  
+                            <tr>  
+                                <td>{{ case.test_case_id }}</td>  
+                                <td>{{ case.input_prompt }}</td>  
+                                <td>{{ case.expected_output }}</td>  
+                                <td>{{ case.generated_output }}</td>  
+                                {% for metric_name in test_run.selected_metrics %}  
+                                <td>{{ "%.2f"|format(case.metric_results[metric_name]['score']) }}</td>  
+                                {% endfor %}  
+                                <td>  
+                                    <input type="hidden" id="messagesData_{{ case.test_case_id }}_{{ deployment_name }}" value='{{ case.messages | tojson }}'>  
+                                    <button type="button" class="btn" onclick="openMessagesModal('{{ case.test_case_id }}', '{{ deployment_name }}')"><i class="fa fa-comments"></i> View Messages</button>  
+                                </td>  
+                            </tr>  
                             {% endfor %}  
-                            <th>Messages</th>  
-                        </tr>  
-                    </thead>  
-                    <tbody>  
-                        {% for case in test_run.test_cases %}  
-                        <tr>  
-                            <td>{{ case.test_case_id }}</td>  
-                            <td>{{ case.input_prompt }}</td>  
-                            <td>{{ case.expected_output }}</td>  
-                            <td>{{ case.generated_output }}</td>  
-                            {% for metric_name in test_run.selected_metrics %}  
-                            <td>{{ "%.2f"|format(case.metric_results[metric_name]['score']) }}</td>  
-                            {% endfor %}  
-                            <td>  
-                                <input type="hidden" id="messagesData_{{ case.test_case_id }}" value='{{ case.messages | tojson }}'>  
-                                <button type="button" class="btn" onclick="openMessagesModal({{ case.test_case_id }})"><i class="fa fa-comments"></i> View Messages</button>  
-                            </td>  
-                        </tr>  
-                        {% endfor %}  
-                    </tbody>  
-                </table>  
-            </div>  
+                        </tbody>  
+                    </table>  
+                </div>  
+                <h4>Average Scores for {{ deployment_name }}</h4>  
+                <ul>  
+                    {% for metric_name, avg_score in test_run.models[deployment_name].average_scores.items() %}  
+                    <li><strong>{{ metric_name }}:</strong> {{ "%.2f"|format(avg_score) }}</li>  
+                    {% endfor %}  
+                </ul>  
+            {% endfor %}  
   
             <div class="form-actions">  
                 <a href="/" class="btn"><i class="fa fa-home"></i> Back to Home</a>  

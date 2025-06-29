@@ -352,9 +352,13 @@
   
             formData.append('test_case_count', testCaseCount);  
   
-            // Append deployment_name  
-            var deploymentNameField = document.getElementsByName('deployment_name')[0];  
-            formData.append('deployment_name', deploymentNameField.value);  
+            // Append deployment_names  
+            var deploymentNameFields = document.getElementsByName('deployment_names');  
+            for (var i = 0; i < deploymentNameFields.length; i++) {  
+                if (deploymentNameFields[i].checked) {  
+                    formData.append('deployment_names', deploymentNameFields[i].value);  
+                }  
+            }  
   
             // Append response_criteria  
             var responseCriteriaField = document.getElementsByName('response_criteria')[0];  
@@ -544,12 +548,15 @@
             <form id="test_dataset_form" method="post">  
                 <!-- Deployment Selection -->  
                 <div class="form-group">  
-                    <label for="deployment_name">Select Deployment Name:</label>  
-                    <select name="deployment_name">  
+                    <label>Select Deployment Names:</label>  
+                    <div>  
                         {% for name in deployment_names %}  
-                        <option value="{{ name }}" {% if name == default_deployment %}selected{% endif %}>{{ name }}</option>  
+                        <label>  
+                            <input type="checkbox" name="deployment_names" value="{{ name }}" {% if name == default_deployment %}checked{% endif %}>  
+                            {{ name }}  
+                        </label><br>  
                         {% endfor %}  
-                    </select>  
+                    </div>  
                 </div>  
   
                 <!-- System Prompt Template Input -->  
@@ -635,7 +642,7 @@
                     <thead>  
                         <tr>  
                             <th>Timestamp</th>  
-                            <th>Deployment Name</th>  
+                            <th>Deployment Names</th>  
                             <th>Average Scores</th>  
                             <th>Duration (s)</th> <!-- Added this column -->  
                             <th>Test Cases</th>  
@@ -646,11 +653,24 @@
                         {% for run in previous_runs %}  
                         <tr>  
                             <td>{{ run.timestamp }}</td>  
-                            <td>{{ run.deployment_name }}</td>  
                             <td>  
-                                {% for metric_name, avg_score in run.average_scores.items() %}  
-                                    {{ metric_name }}: {{ "%.2f"|format(avg_score) }}<br>  
+                                {% for name in run.deployment_names %}  
+                                    {{ name }}<br>  
                                 {% endfor %}  
+                            </td>  
+                            <td>  
+                                {% if run.models %}  
+                                    {% for model_name, model_data in run.models.items() %}  
+                                        <strong>{{ model_name }}</strong><br>  
+                                        {% for metric_name, avg_score in model_data.average_scores.items() %}  
+                                            {{ metric_name }}: {{ "%.2f"|format(avg_score) }}<br>  
+                                        {% endfor %}  
+                                    {% endfor %}  
+                                {% else %}  
+                                    {% for metric_name, avg_score in run.average_scores.items() %}  
+                                        {{ metric_name }}: {{ "%.2f"|format(avg_score) }}<br>  
+                                    {% endfor %}  
+                                {% endif %}  
                             </td>  
                             <td>  
                                 {% if run.total_duration_seconds %}  
