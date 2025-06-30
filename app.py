@@ -244,31 +244,31 @@ def perform_vector_search(vector: list, db_name: str, collection_name: str, inde
         return []  
   
     # Build the vector search pipeline  
-    pipeline = [
-            {
-                "$vectorSearch": {
-                    "index": index_name,
-                    "queryVector": vector,
-                    "path": vector_field,
-                    "numCandidates": 100,  # Adjust as needed for recall/latency tradeoff
-                    "limit": 5
-                }
-            },
-            {
-                "$project": {
-                    "_id": 0,
-                    vector_field: 0,  # Exclude the embedding field
-                    "score": {"$meta": "vectorSearchScore"}
-                }
-            }
-    ]
+    pipeline = [  
+        {  
+            "$vectorSearch": {  
+                "index": index_name,  
+                "queryVector": vector,  
+                "path": vector_field,  
+                "numCandidates": 100,  # Adjust as needed for recall/latency tradeoff  
+                "limit": 5  
+            }  
+        },  
+        {  
+            "$project": {  
+                # Start with empty projection  
+                "_id": 0  
+            }  
+        }  
+    ]  
   
-    # Modify the $project stage to include only the selected fields  
     project_stage = pipeline[1]["$project"]  
-    # Remove existing fields other than "score"  
-    for key in list(project_stage.keys()):  
-        if key not in ["score"]:  
-            del project_stage[key]  
+  
+    # Add the 'score' field from vector search  
+    project_stage["score"] = {"$meta": "vectorSearchScore"}  
+  
+    # Remove 'score' from selected_fields if present  
+    selected_fields = [field for field in selected_fields if field != 'score']  
   
     # Add selected fields to the $project  
     for field in selected_fields:  
@@ -278,6 +278,10 @@ def perform_vector_search(vector: list, db_name: str, collection_name: str, inde
         collection = mongo_client[db_name][collection_name]  
   
         results = list(collection.aggregate(pipeline))  
+        if not results:  
+            print("No documents found from vector search.")  
+            return []  
+  
         return results  
     except Exception as e:  
         print(f"Error during vector search in MongoDB: {e}", file=sys.stderr)  
