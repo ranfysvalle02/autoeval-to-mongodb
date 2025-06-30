@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from bson.objectid import ObjectId  
 import time  
 import bson  
+import decimal  
   
 def bson_serializer(obj):  
     if isinstance(obj, datetime.datetime):  
@@ -48,28 +49,48 @@ AZURE_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
 AZURE_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", "")  
 AZURE_API_VERSION = "2024-12-01-preview"  # Update to your API version if necessary  
   
+# VoyageAI Configuration  
+VOYAGE_API_KEY = os.environ.get("VOYAGE_API_KEY", "")  # Ensure this is set in your environment variables  
+  
 # Deployment names available for selection  
 DEPLOYMENT_NAMES = ["o3-mini", "gpt-4o", "gpt-4o-mini"]  # List of available deployment names  
   
 # Default deployment name  
 DEFAULT_DEPLOYMENT_NAME = "o3-mini"  
   
-# Azure Embedding Models Configuration  
-# Define your embedding models and their corresponding deployment names  
+# Embedding Models Configuration  
+# Define your embedding models, their providers, and necessary details  
 EMBEDDING_MODELS = {  
+    # Azure OpenAI Embedding Models  
     "text-embedding-3-large": {  
-        "deployment_name": "text-embedding-3-large"  
+        "deployment_name": "text-embedding-3-large",  
+        "provider": "azure_openai"  
     },  
     "text-embedding-3-small": {  
-        "deployment_name": "text-embedding-3-small"  
+        "deployment_name": "text-embedding-3-small",  
+        "provider": "azure_openai"  
     },  
     "text-embedding-ada-002": {  
-        "deployment_name": "text-embedding-ada-002"  
-    }  
+        "deployment_name": "text-embedding-ada-002",  
+        "provider": "azure_openai"  
+    },  
+    # VoyageAI Embedding Models  
+    "voyage-3-large": {  
+        "model_name": "voyage-3-large",  
+        "provider": "voyageai"  
+    },  
+    "voyage-3.5": {  
+        "model_name": "voyage-3.5",  
+        "provider": "voyageai"  
+    },  
+    "voyage-3.5-lite": {  
+        "model_name": "voyage-3.5-lite",  
+        "provider": "voyageai"  
+    },  
 }  
   
-# Default embedding deployment name  
-DEFAULT_EMBEDDING_DEPLOYMENT_NAME = "text-embedding-ada-002"  
+# Default embedding model name  
+DEFAULT_EMBEDDING_MODEL_NAME = "text-embedding-ada-002"  
   
 # MongoDB Configuration  
 MONGO_URI = os.environ.get("MONGO_URI")  # Ensure this is set in your environment variables  
@@ -95,6 +116,16 @@ except Exception as e:
           file=sys.stderr)  
     sys.exit(1)  
   
+# Initialize VoyageAI Client  
+voyage_client = None  
+try:  
+    import voyageai  
+    voyage_client = voyageai.Client(api_key=VOYAGE_API_KEY)  
+    print("Successfully initialized VoyageAI client.")  
+except Exception as e:  
+    print(f"Fatal Error: Could not initialize VoyageAI client. Check your configuration. Details: {e}", file=sys.stderr)  
+    # Not exiting, since Azure OpenAI can still be used  
+  
 # Initialize MongoDB Client  
 mongo_client = None  
 if MONGO_URI:  
@@ -102,6 +133,7 @@ if MONGO_URI:
         mongo_client = MongoClient(MONGO_URI)  
         db = mongo_client[DB_NAME]  
         test_runs_collection = db["test_runs"]  
+        idx_meta_collection = db["idx_meta"]  # Collection to store index metadata  
         print(f"Successfully connected to MongoDB '{DB_NAME}' database.")  
     except Exception as e:  
         print(f"Fatal Error: Could not connect to MongoDB. Check MONGO_URI. Details: {e}", file=sys.stderr)  
@@ -168,15 +200,39 @@ METRICS = {
   
 # --- Helper Functions for RAG ---  
   
-def get_embedding(text: str, model_deployment_name: str) -> Optional[list]:  
-    """Generates a vector embedding for a given text using Azure OpenAI."""  
-    if not azure_client:  
-        raise ValueError("Azure client is not initialized.")  
-    try:  
-        response = azure_client.embeddings.create(input=[text], model=model_deployment_name)  
-        return response.data[0].embedding  
-    except Exception as e:  
-        print(f"Error generating embedding: {e}", file=sys.stderr)  
+def get_embedding(text: str, model_info: dict) -> Optional[list]:  
+    """Generates a vector embedding for a given text using the specified model."""  
+    provider = model_info.get('provider', 'azure_openai')  # Default to 'azure_openai' for backward compatibility  
+    if provider == 'azure_openai':  
+        model_deployment_name = model_info.get('deployment_name')  
+        if not azure_client:  
+            raise ValueError("Azure client is not initialized.")  
+        try:  
+            response = azure_client.embeddings.create(input=[text], model=model_deployment_name)  
+            return response.data[0].embedding  
+        except Exception as e:  
+            print(f"Error generating embedding: {e}", file=sys.stderr)  
+            return None  
+    elif provider == 'voyageai':  
+        model_name = model_info.get('model_name')  
+        if not voyage_client:  
+            raise ValueError("VoyageAI client is not initialized.")  
+        try:  
+            # VoyageAI embeddings code  
+            response = voyage_client.embed(  
+                [text],  
+                model=model_name,  
+                input_type="document",  
+                output_dimension=model_info.get('output_dimension'),  
+                output_dtype=model_info.get('output_dtype', 'float')  
+            )  
+            embeddings = response.embeddings  
+            return embeddings[0]  
+        except Exception as e:  
+            print(f"Error generating VoyageAI embedding: {e}", file=sys.stderr)  
+            return None  
+    else:  
+        print(f"Unknown embedding provider: {provider}", file=sys.stderr)  
         return None  
   
 def perform_vector_search(vector: list, db_name: str, collection_name: str, index_name: str, vector_field: str, selected_fields: list) -> list:  
@@ -188,25 +244,24 @@ def perform_vector_search(vector: list, db_name: str, collection_name: str, inde
         return []  
   
     # Build the vector search pipeline  
-    pipeline = [  
-        {  
-            "$search": {  
-                "index": index_name,  
-                "knnBeta": {  
-                    "vector": vector,  
-                    "path": vector_field,  
-                    "k": 5  
-                }  
-            }  
-        },  
-        {  
-            "$project": {  
-                "_id": 0,  
-                vector_field: 0,          # Exclude the embedding field  
-                "score": {"$meta": "searchScore"}  
-            }  
-        },  
-    ]  
+    pipeline = [
+            {
+                "$vectorSearch": {
+                    "index": index_name,
+                    "queryVector": vector,
+                    "path": vector_field,
+                    "numCandidates": 100,  # Adjust as needed for recall/latency tradeoff
+                    "limit": 5
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0,
+                    vector_field: 0,  # Exclude the embedding field
+                    "score": {"$meta": "vectorSearchScore"}
+                }
+            }
+    ]
   
     # Modify the $project stage to include only the selected fields  
     project_stage = pipeline[1]["$project"]  
@@ -229,7 +284,7 @@ def perform_vector_search(vector: list, db_name: str, collection_name: str, inde
         return []  
   
 def run_rag_task(input_prompt: str, deployment_name: str, response_criteria: str, system_prompt_template: str, user_prompt_template: str,  
-                 db_name: str, collection_name: str, index_name: str, vector_field: str, embedding_model_deployment_name: str, selected_fields: list):  
+                 db_name: str, collection_name: str, index_name: str, vector_field: str, embedding_model_name: str, selected_fields: list):  
     """  
     Executes the full Retrieval-Augmented Generation (RAG) task:  
     1. Generates an embedding for the input.  
@@ -242,9 +297,15 @@ def run_rag_task(input_prompt: str, deployment_name: str, response_criteria: str
     if not mongo_client:  
         return "Error: MongoDB client is not initialized.", [], []  
   
+    # Get embedding model info  
+    embedding_model_info = EMBEDDING_MODELS.get(embedding_model_name)  
+    if not embedding_model_info:  
+        print(f"Embedding model '{embedding_model_name}' is not recognized.", file=sys.stderr)  
+        return "Error: Embedding model not recognized.", [], []  
+  
     # 1. Get query vector  
-    print(f"Generating embedding for query: '{input_prompt}' using embedding model '{embedding_model_deployment_name}'")  
-    query_vector = get_embedding(input_prompt, embedding_model_deployment_name)  
+    print(f"Generating embedding for query: '{input_prompt}' using embedding model '{embedding_model_name}'")  
+    query_vector = get_embedding(input_prompt, embedding_model_info)  
     if not query_vector:  
         return "Error: Failed to generate embedding for the query.", [], []  
   
@@ -315,7 +376,7 @@ def get_test_dataset_from_form(form_data):
     return test_dataset  
   
 def test_rag_task_with_metrics(test_dataset, deployment_names, response_criteria, system_prompt_template, user_prompt_template, selected_metrics,  
-                               db_name, collection_name, index_name, vector_field, embedding_model_deployment_name, selected_fields):  
+                               db_name, collection_name, index_name, vector_field, embedding_model_name, selected_fields):  
     """Runs the RAG task on test data for multiple deployment names, evaluates selected metrics, and returns the results."""  
     test_run = {  
         "timestamp": datetime.datetime.utcnow().isoformat(),  
@@ -331,7 +392,7 @@ def test_rag_task_with_metrics(test_dataset, deployment_names, response_criteria
         "collection_name": collection_name,  
         "index_name": index_name,  
         "vector_field": vector_field,  
-        "embedding_model_name": embedding_model_deployment_name,  # Store the embedding model used  
+        "embedding_model_name": embedding_model_name,  # Store the embedding model used  
         "selected_fields": selected_fields,  # Include selected fields  
     }  
   
@@ -361,7 +422,7 @@ def test_rag_task_with_metrics(test_dataset, deployment_names, response_criteria
                 collection_name,  
                 index_name,  
                 vector_field,  
-                embedding_model_deployment_name,  
+                embedding_model_name,  
                 selected_fields  
             )  
   
@@ -561,7 +622,7 @@ def get_atlas_search_indexes(db_name, collection_name):
             mappings = definition.get('mappings', {})  
             fields = mappings.get('fields', {})  
             for field_name, field_info in fields.items():  
-                if field_info.get('type') == 'knnVector':  
+                if field_info.get('type') == 'vector' or field_info.get('type') == 'knnVector':  
                     index_info['embedding_field'] = field_name  
                     break  
             index_info_list.append(index_info)  
@@ -585,20 +646,17 @@ def create_embedding_search_index(db_name, collection_name, index_name, embeddin
   
         search_index_model = SearchIndexModel(  
             definition={  
-                "mappings": {  
-                    "dynamic": False,  
-                    "fields": {  
-                        str(embedding_field): {  
-                            "type": "knnVector",  
-                            "dimensions": num_dimensions,  
-                            "similarity": {  
-                                "type": "cosine"  
-                            }  
-                        }  
+                "fields": [  
+                    {  
+                        "type": "vector",  
+                        "path": embedding_field,  
+                        "numDimensions": num_dimensions,  
+                        "similarity": "cosine"  
                     }  
-                }  
+                ]  
             },  
-            name=index_name  
+            name=index_name,  
+            type="vectorSearch"  
         )  
   
         collection.create_search_index(search_index_model)  
@@ -609,24 +667,44 @@ def create_embedding_search_index(db_name, collection_name, index_name, embeddin
         print(f"Error creating search index {index_name} for {db_name}.{collection_name}: {e}", file=sys.stderr)  
         return False  
   
-def generate_embeddings_for_collection(db_name, collection_name, source_field, embedding_models, records_limit):  
-    """Generates embeddings for documents in a collection based on the source field and stores them in specified embedding fields."""  
-    collection = mongo_client[db_name][collection_name]  
+def generate_embeddings_for_collection(  
+    source_db_name, source_collection_name, source_field, match_stage, embedding_models, records_limit,  
+    destination_db_name, destination_collection_name):  
   
-    documents_to_update = collection.find(  
-        {  
-            source_field: {'$exists': True, '$ne': None},  
-        },  
-        {source_field: 1}  
+    """Clones documents from source to destination collection, applies match_stage if any, generates embeddings in destination collection."""  
+    source_collection = mongo_client[source_db_name][source_collection_name]  
+    destination_collection = mongo_client[destination_db_name][destination_collection_name]  
+  
+    # Cloning documents with match_stage  
+    query = match_stage if match_stage else {}  
+    cursor = source_collection.find(query).limit(records_limit)  
+  
+    print(f"Cloning documents from {source_db_name}.{source_collection_name} to {destination_db_name}.{destination_collection_name} with match stage: {match_stage}")  
+  
+    documents_to_insert = []  
+    for doc in cursor:  
+        # Remove _id to avoid duplicate key error if copying back into same collection  
+        doc['_id'] = ObjectId()  # Create new _id for each doc  
+        documents_to_insert.append(doc)  
+  
+    if documents_to_insert:  
+        result = destination_collection.insert_many(documents_to_insert)  
+        print(f"Inserted {len(result.inserted_ids)} documents into {destination_db_name}.{destination_collection_name}")  
+    else:  
+        print(f"No documents to insert into {destination_db_name}.{destination_collection_name}")  
+        return  
+  
+    # Now, generate embeddings in destination collection  
+    documents_to_update = destination_collection.find(  
+        {source_field: {'$exists': True, '$ne': None}},  
+        {'_id': 1, source_field: 1}  
     ).limit(records_limit)  
   
-    total_docs = collection.count_documents(  
-        {  
-            source_field: {'$exists': True, '$ne': None},  
-        }  
+    total_docs = destination_collection.count_documents(  
+        {source_field: {'$exists': True, '$ne': None}}  
     )  
   
-    print(f"Generating embeddings for up to {records_limit} documents in {db_name}.{collection_name}...")  
+    print(f"Generating embeddings for up to {records_limit} documents in {destination_db_name}.{destination_collection_name}...")  
   
     batch_size = 100  
     documents = []  
@@ -634,12 +712,12 @@ def generate_embeddings_for_collection(db_name, collection_name, source_field, e
     for doc in documents_to_update:  
         documents.append(doc)  
         if len(documents) >= batch_size:  
-            process_documents(documents, collection, source_field, embedding_models)  
+            process_documents(documents, destination_collection, source_field, embedding_models)  
             processed_docs += len(documents)  
             print(f"Processed {processed_docs}/{records_limit} documents.")  
             documents = []  
     if documents:  
-        process_documents(documents, collection, source_field, embedding_models)  
+        process_documents(documents, destination_collection, source_field, embedding_models)  
         processed_docs += len(documents)  
         print(f"Processed {processed_docs}/{records_limit} documents.")  
   
@@ -650,7 +728,7 @@ def process_documents(documents, collection, source_field, embedding_models):
         if text_to_embed and isinstance(text_to_embed, str):  
             update_fields = {}  
             for model_name, model_info in embedding_models.items():  
-                embedding = get_embedding(text_to_embed, model_info['deployment_name'])  
+                embedding = get_embedding(text_to_embed, model_info)  
                 if embedding:  
                     update_fields[model_info['embedding_field_name_in_doc']] = embedding  
                 else:  
@@ -742,7 +820,17 @@ Below is the context, which includes plots of movies.
     current_year = datetime.datetime.utcnow().year  # Pass current_year to template  
   
     # Default embedding model name  
-    default_embedding_model = DEFAULT_EMBEDDING_DEPLOYMENT_NAME  
+    default_embedding_model = DEFAULT_EMBEDDING_MODEL_NAME  
+  
+    # Fetch idx_meta entries  
+    try:  
+        idx_meta_entries = list(idx_meta_collection.find({}))  
+        # Convert ObjectId to string for use in templates  
+        for entry in idx_meta_entries:  
+            entry['_id'] = str(entry['_id'])  
+    except Exception as e:  
+        print(f"Error fetching idx_meta entries: {e}", file=sys.stderr)  
+        idx_meta_entries = []  
   
     return render_template(  
         'index.html',  
@@ -757,9 +845,30 @@ Below is the context, which includes plots of movies.
         available_metrics=available_metrics,  
         databases=databases_info,  # Use databases_info which includes collections and embedding fields  
         embedding_models=EMBEDDING_MODELS,  # Pass embedding models to template  
-        default_embedding_model=default_embedding_model  # Pass default embedding model to template  
+        default_embedding_model=default_embedding_model,  # Pass default embedding model to template  
+        idx_meta_entries=idx_meta_entries  # Pass idx_meta entries to template  
     )  
-  
+@app.route('/get_fields', methods=['POST'])  
+def get_fields_route():  
+    idx_meta_id = request.form.get('idx_meta_id')  
+    if idx_meta_id:  
+        try:  
+            idx_meta = idx_meta_collection.find_one({'_id': ObjectId(idx_meta_id)})  
+            if not idx_meta:  
+                return jsonify({'fields': []})  
+            db_name = idx_meta.get('destination_db')  
+            collection_name = idx_meta.get('destination_collection')  
+            # Now fetch the fields using these values  
+            fields = get_collection_fields(db_name, collection_name)  
+            # Return fields as a list of dicts with 'name' key  
+            fields_info = [{'name': field} for field in fields]  
+            return jsonify({'fields': fields_info})  
+        except Exception as e:  
+            print(f"Error fetching fields by idx_meta_id: {e}", file=sys.stderr)  
+            return jsonify({'fields': []})  
+    else:  
+        # If idx_meta_id is not provided, handle accordingly  
+        return jsonify({'fields': []})  
 @app.route('/get_collections', methods=['POST'])  
 def get_collections_route():  
     db_name = request.form.get('db_name')  
@@ -799,14 +908,6 @@ def get_vector_fields_route():
     vector_fields_info = [{'name': field} for field in embedding_fields]  
     return jsonify({'vector_fields': vector_fields_info})  # Adjusted  
   
-@app.route('/get_fields', methods=['POST'])  
-def get_fields_route():  
-    db_name = request.form.get('db_name')  
-    collection_name = request.form.get('collection_name')  
-    fields = get_collection_fields(db_name, collection_name)  
-    # Return fields as a list of dicts with 'name' key  
-    fields_info = [{'name': field} for field in fields]  
-    return jsonify({'fields': fields_info})  
   
 @app.route('/add_test_case', methods=['POST'])  
 def add_test_case():  
@@ -872,21 +973,20 @@ def run_test():
     if not selected_metrics:  
         # Default to Factuality if no metrics are selected  
         selected_metrics = ['Factuality']  
-    # Get MongoDB parameters  
-    db_name = request.form.get('db_name')  
-    collection_name = request.form.get('collection_name')  
-    index_name = request.form.get('index_name')  
-    vector_field = request.form.get('vector_field')  
+    # Get idx_meta_id from the form  
+    idx_meta_id = request.form.get('idx_meta_id')  
+    if not idx_meta_id:  
+        return "Error: Index configuration must be selected.", 400  
+    idx_meta = idx_meta_collection.find_one({'_id': ObjectId(idx_meta_id)})  
+    if not idx_meta:  
+        return "Error: Selected index configuration not found.", 400  
   
-    # Get the embedding model from the form  
-    embedding_model_name = request.form.get('embedding_model')  
-    if not embedding_model_name:  
-        embedding_model_name = DEFAULT_EMBEDDING_DEPLOYMENT_NAME  
-  
-    embedding_model_info = EMBEDDING_MODELS.get(embedding_model_name)  
-    if not embedding_model_info:  
-        return "Error: Selected embedding model is not recognized.", 400  
-    embedding_model_deployment_name = embedding_model_info['deployment_name']  
+    # Extract parameters from idx_meta  
+    db_name = idx_meta.get('destination_db')  
+    collection_name = idx_meta.get('destination_collection')  
+    index_name = idx_meta.get('index_name')  
+    vector_field = idx_meta.get('embedding_field')  
+    embedding_model_name = idx_meta.get('embedding_model_name')  
   
     # Get selected fields  
     selected_fields = request.form.getlist('fields')  
@@ -907,7 +1007,7 @@ def run_test():
         collection_name,  
         index_name,  
         vector_field,  
-        embedding_model_deployment_name,  
+        embedding_model_name,  
         selected_fields  # Pass it here  
     )  
   
@@ -945,28 +1045,23 @@ def preview():
     if not selected_metrics:  
         # Default to Factuality if no metrics are selected  
         selected_metrics = ['Factuality']  
-    # Get MongoDB parameters  
-    db_name = request.form.get('db_name')  
-    collection_name = request.form.get('collection_name')  
-    index_name = request.form.get('index_name')  
-    vector_field = request.form.get('vector_field')  
+    # Get idx_meta_id from the form  
+    idx_meta_id = request.form.get('idx_meta_id')  
+    if not idx_meta_id:  
+        return "Error: Index configuration must be selected.", 400  
+    idx_meta = idx_meta_collection.find_one({'_id': ObjectId(idx_meta_id)})  
+    if not idx_meta:  
+        return "Error: Selected index configuration not found.", 400  
   
-    # Get the embedding model from the form  
-    embedding_model_name = request.form.get('embedding_model')  
-    if not embedding_model_name:  
-        embedding_model_name = DEFAULT_EMBEDDING_DEPLOYMENT_NAME  
-  
-    embedding_model_info = EMBEDDING_MODELS.get(embedding_model_name)  
-    if not embedding_model_info:  
-        return "Error: Selected embedding model is not recognized.", 400  
-    embedding_model_deployment_name = embedding_model_info['deployment_name']  
+    # Extract parameters from idx_meta  
+    db_name = idx_meta.get('destination_db')  
+    collection_name = idx_meta.get('destination_collection')  
+    index_name = idx_meta.get('index_name')  
+    vector_field = idx_meta.get('embedding_field')  
+    embedding_model_name = idx_meta.get('embedding_model_name')  
   
     # Get selected fields  
     selected_fields = request.form.getlist('fields')  
-  
-    # Check if necessary parameters are provided  
-    if not all([db_name, collection_name, index_name, vector_field]):  
-        return "Error: Database, collection, index name, and vector field must be specified.", 400  
   
     # Now process each selected deployment  
     deployment_results = []  
@@ -974,7 +1069,7 @@ def preview():
     for deployment_name in deployment_names:  
         generated_output, messages, context_docs = run_rag_task(  
             input_prompt, deployment_name, response_criteria, system_prompt_template, user_prompt_template,  
-            db_name, collection_name, index_name, vector_field, embedding_model_deployment_name, selected_fields)  
+            db_name, collection_name, index_name, vector_field, embedding_model_name, selected_fields)  
   
         # Reconstruct context_str from context_docs  
         if context_docs:  
@@ -1087,10 +1182,25 @@ def list_indexes():
             embedding_field_prefix = request.form.get('embedding_field')  
             selected_embedding_models = request.form.getlist('embedding_models')  
             records_limit = int(request.form.get('records_limit', '100'))  
-  
-            if not all([db_name, collection_name, source_field, embedding_field_prefix, selected_embedding_models]):  
-                error_message = "All fields are required to create an index."  
+            match_stage_str = request.form.get('match_stage', '')  
+            if match_stage_str:  
+                try:  
+                    match_stage = json.loads(match_stage_str)  
+                except json.JSONDecodeError as e:  
+                    error_message = f"Invalid JSON in match stage: {e}"  
+                    match_stage = {}  
             else:  
+                match_stage = {}  
+  
+            # Set destination db and collection  
+            destination_db_name = 'mdb_autoevals'  
+            destination_collection_name = f"{db_name}__{collection_name}"  
+  
+            # Ensure that only one source field is specified  
+            if not source_field or ',' in source_field or ' ' in source_field.strip():  
+                error_message = "Please specify only one source field."  
+            else:  
+                # Proceed with embedding generation  
                 # Prepare embedding models based on selection  
                 embedding_models = {}  
                 for model_name in selected_embedding_models:  
@@ -1114,27 +1224,46 @@ def list_indexes():
                     error_message = "No valid embedding models selected."  
                 else:  
                     try:  
-                        # Generate embeddings  
-                        generate_embeddings_for_collection(db_name, collection_name, source_field, embedding_models, records_limit)  
+                        # Generate embeddings and clone documents  
+                        generate_embeddings_for_collection(  
+                            db_name, collection_name, source_field, match_stage, embedding_models, records_limit,  
+                            destination_db_name, destination_collection_name)  
   
                         # Create indexes for each selected embedding model  
                         for model_name, model_info in embedding_models.items():  
                             embedding_field_name_in_doc = model_info['embedding_field_name_in_doc']  
                             index_name = model_info['index_name']  
-  
                             # Fetch a sample embedding to get dimensions  
-                            sample_embedding = get_embedding("sample text for dimensions", model_info['deployment_name'])  
+                            sample_embedding = get_embedding("sample text for dimensions", model_info)  
                             if sample_embedding is None:  
-                                raise ValueError(f"Could not get sample embedding for model '{model_info['deployment_name']}'.")  
+                                raise ValueError(f"Could not get sample embedding for model '{model_name}'.")  
                             num_dimensions = len(sample_embedding)  
-  
                             # Create index  
                             result = create_embedding_search_index(  
-                                db_name, collection_name, index_name, embedding_field_name_in_doc,  
+                                destination_db_name, destination_collection_name, index_name, embedding_field_name_in_doc,  
                                 num_dimensions  
                             )  
                             if result:  
                                 print(f"Index '{index_name}' created successfully for model '{model_name}'.")  
+  
+                                # Collect metadata for idx_meta collection  
+                                idx_meta = {  
+                                    "timestamp": datetime.datetime.utcnow(),  
+                                    "index_name": index_name,  
+                                    "embedding_field": embedding_field_name_in_doc,  
+                                    "num_dimensions": num_dimensions,  
+                                    "source_db": db_name,  
+                                    "source_collection": collection_name,  
+                                    "destination_db": destination_db_name,  
+                                    "destination_collection": destination_collection_name,  
+                                    "match_stage": match_stage,  
+                                    "embedding_model_name": model_name,  
+                                    "embedding_model_deployment_name": model_info.get('deployment_name') or model_info.get('model_name'),  
+                                    "records_limit": records_limit,  
+                                    "source_field": source_field,  # Include the source_field in metadata  
+                                }  
+                                # Insert metadata into idx_meta collection  
+                                idx_meta_collection.insert_one(idx_meta)  
                             else:  
                                 error_message = f"Failed to create index '{index_name}' for model '{model_name}'."  
                                 break  # Exit loop on failure  
@@ -1146,13 +1275,37 @@ def list_indexes():
                         error_message = f"An error occurred: {e}"  
   
     # Fetch databases and their collections and indexes  
-    databases_info = get_databases()  
+    databases_info = []  
+    mdb_autoevals_db_name = 'mdb_autoevals'  
+    try:  
+        mdb_autoevals_db = mongo_client[mdb_autoevals_db_name]  
+        collections = mdb_autoevals_db.list_collection_names()  
+        db_info = {  
+            'name': mdb_autoevals_db_name,  
+            'collections': []  
+        }  
+        for collection_name in collections:  
+            fields = get_collection_fields(mdb_autoevals_db_name, collection_name)  
+            indexes = get_atlas_search_indexes(mdb_autoevals_db_name, collection_name)  
+            collection_info = {  
+                'name': collection_name,  
+                'fields': fields,  
+                'indexes': indexes  
+            }  
+            db_info['collections'].append(collection_info)  
+        databases_info.append(db_info)  
+    except Exception as e:  
+        error_message = f"Error fetching collections: {e}"  
+  
+    # Now, we also need the list of source databases for the form  
+    source_databases_info = get_databases()  
   
     current_year = datetime.datetime.utcnow().year  
   
     return render_template(  
         'list_indexes.html',  
         databases=databases_info,  
+        source_databases=source_databases_info,  
         current_year=current_year,  
         error_message=error_message,  
         success_message=success_message,  
