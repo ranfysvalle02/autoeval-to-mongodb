@@ -265,7 +265,7 @@ def perform_vector_search(vector: list, db_name: str, collection_name: str, inde
     project_stage = pipeline[1]["$project"]  
   
     # Add the 'score' field from vector search  
-    project_stage["score"] = {"$meta": "vectorSearchScore"}  
+    project_stage["vs_score"] = {"$meta": "vectorSearchScore"}  
   
     # Remove 'score' from selected_fields if present  
     selected_fields = [field for field in selected_fields if field != 'score']  
