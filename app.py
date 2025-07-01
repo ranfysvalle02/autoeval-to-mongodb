@@ -133,6 +133,7 @@ if MONGO_URI:
         mongo_client = MongoClient(MONGO_URI)  
         db = mongo_client[DB_NAME]  
         test_runs_collection = db["test_runs"]  
+        classifiers_collection = db["classifiers"]  # New collection for classifiers  
         idx_meta_collection = db["idx_meta"]  # Collection to store index metadata  
         print(f"Successfully connected to MongoDB '{DB_NAME}' database.")  
     except Exception as e:  
@@ -161,30 +162,6 @@ init(azure_client)
   
 factuality_evaluator = Factuality(client=azure_client)  # Pass the Azure client  
   
-kid_friendly_classifier = LLMClassifier(  
-    name="Kid-Friendly Movie Classifier",  
-    prompt_template=(  
-        "On a scale of 0 to 1, where 1 is perfectly suitable for children under 13 years old and 0 is completely unsuitable, "  
-        "how kid-friendly is the following movie description? "  
-        "Choose one of the following categories that best represents the score:\n"  
-        "- 'Category_0.0' (Completely Unsuitable - score 0.0-0.1)\n"  
-        "- 'Category_0.25' (Mostly Unsuitable - score 0.1-0.4)\n"  
-        "- 'Category_0.5' (Moderately Kid-Friendly - score 0.4-0.6)\n"  
-        "- 'Category_0.75' (Very Kid-Friendly - score 0.6-0.9)\n"  
-        "- 'Category_1.0' (Perfectly Suitable - score 0.9-1.0)\n\n"  
-        "Movie Description: {{output}}"  
-    ),  
-    choice_scores={  
-        "Category_0.0": 0.0,  
-        "Category_0.25": 0.25,  
-        "Category_0.5": 0.5,  
-        "Category_0.75": 0.75,  
-        "Category_1.0": 1.0,  
-    },  
-    use_cot=True,  
-    client=azure_client  # Pass the Azure client  
-)  
-  
 # Instantiate new evaluators  
 relevancy_evaluator = ContextRelevancy(client=azure_client)  
 faithfulness_evaluator = Faithfulness(client=azure_client)  
@@ -193,10 +170,45 @@ faithfulness_evaluator = Faithfulness(client=azure_client)
 METRICS = {  
     'Factuality': factuality_evaluator,     # Instance of Factuality evaluator  
     'Exact Match': exact_match,             # Custom exact match scorer (function)  
-    'Kid Friendly': kid_friendly_classifier,    # Instance of LLMClassifier  
+    # 'Kid Friendly' will be loaded from the database  
     'Context Relevancy': relevancy_evaluator,   # Instance of ContextRelevancy  
     'Faithfulness': faithfulness_evaluator,     # Instance of Faithfulness  
 }  
+  
+# Load classifiers from the database and add them to METRICS  
+try:  
+    classifiers_cursor = classifiers_collection.find({})  
+    for classifier_doc in classifiers_cursor:  
+        name = classifier_doc.get('name')  
+        if name in METRICS:  
+            print(f"Classifier '{name}' already exists in METRICS, skipping...", file=sys.stderr)  
+            continue  
+        prompt_template = classifier_doc.get('prompt_template')  
+        choice_scores = classifier_doc.get('choice_scores')  
+        use_cot = classifier_doc.get('use_cot', False)  
+        model_deployment_name = classifier_doc.get('model_deployment_name', DEFAULT_DEPLOYMENT_NAME)  
+        temperature = classifier_doc.get('temperature', 0.0)  
+  
+        # Instantiate an LLMClassifier with these parameters  
+        classifier_instance = LLMClassifier(  
+            name=name,  
+            prompt_template=prompt_template,  
+            choice_scores=choice_scores,  
+            use_cot=use_cot,  
+            client=azure_client,  
+            deployment_name=model_deployment_name,  
+            temperature=temperature  
+        )  
+  
+        # Add the classifier to the METRICS dictionary  
+        METRICS[name] = classifier_instance  
+except Exception as e:  
+    print(f"Error loading classifiers from database: {e}", file=sys.stderr)  
+  
+# Helper function to convert model names to safe field names  
+def to_pascal_case(text: str) -> str:  
+    """Converts a string to PascalCase."""  
+    return ''.join(word.capitalize() for word in re.split(r'[\W_]+', text))  
   
 # --- Helper Functions for RAG ---  
   
@@ -455,7 +467,7 @@ def test_rag_task_with_metrics(test_dataset, deployment_names, response_criteria
                     )  
                 elif hasattr(evaluator, 'eval'):  
                     # For class-based evaluators with an eval method  
-                    if metric_name == "Factuality":  
+                    if isinstance(evaluator, Factuality):  
                         # Ensure that 'expected_output' is provided for Factuality evaluation  
                         if not expected_output:  
                             print(f"Expected output is required for Factuality evaluation in Test Case {idx+1}.", file=sys.stderr)  
@@ -466,18 +478,18 @@ def test_rag_task_with_metrics(test_dataset, deployment_names, response_criteria
                                 output=generated_output,  
                                 expected=expected_output  
                             )  
-                    elif metric_name == "Kid Friendly":  
+                    elif isinstance(evaluator, LLMClassifier):  
                         result = evaluator.eval(  
                             output=generated_output  
                         )  
-                    elif metric_name in ("Context Relevancy", "Faithfulness"):  
+                    elif isinstance(evaluator, (ContextRelevancy, Faithfulness)):  
                         result = evaluator.eval(  
                             input=input_prompt,  
                             output=generated_output,  
                             context=context_str  
                         )  
                     else:  
-                        print(f"Metric {metric_name} is not recognized.", file=sys.stderr)  
+                        print(f"Evaluator of type {type(evaluator)} for metric {metric_name} is not recognized.", file=sys.stderr)  
                         continue  
                 else:  
                     print(f"Evaluator for {metric_name} is not callable or does not have an eval method.", file=sys.stderr)  
@@ -544,11 +556,6 @@ def test_rag_task_with_metrics(test_dataset, deployment_names, response_criteria
     test_run["total_duration_seconds"] = total_duration  
   
     return test_run  
-  
-# Helper function to convert model names to safe field names  
-def to_pascal_case(text: str) -> str:  
-    """Converts a string to PascalCase."""  
-    return ''.join(word.capitalize() for word in re.split(r'[\W_]+', text))  
   
 # --- Helper Functions to List and Manage Databases, Collections, Fields, and Atlas Search Indexes ---  
   
@@ -852,6 +859,7 @@ Below is the context, which includes plots of movies.
         default_embedding_model=default_embedding_model,  # Pass default embedding model to template  
         idx_meta_entries=idx_meta_entries  # Pass idx_meta entries to template  
     )  
+  
 @app.route('/get_fields', methods=['POST'])  
 def get_fields_route():  
     idx_meta_id = request.form.get('idx_meta_id')  
@@ -873,6 +881,7 @@ def get_fields_route():
     else:  
         # If idx_meta_id is not provided, handle accordingly  
         return jsonify({'fields': []})  
+  
 @app.route('/get_collections', methods=['POST'])  
 def get_collections_route():  
     db_name = request.form.get('db_name')  
@@ -911,7 +920,6 @@ def get_vector_fields_route():
     # Return vector fields as a list of dicts with 'name' key  
     vector_fields_info = [{'name': field} for field in embedding_fields]  
     return jsonify({'vector_fields': vector_fields_info})  # Adjusted  
-  
   
 @app.route('/add_test_case', methods=['POST'])  
 def add_test_case():  
@@ -1100,7 +1108,7 @@ def preview():
                 )  
             elif hasattr(evaluator, 'eval'):  
                 # For class-based evaluators with an eval method  
-                if metric_name == "Factuality":  
+                if isinstance(evaluator, Factuality):  
                     # Ensure that 'expected_output' is provided for Factuality evaluation  
                     if not expected_output:  
                         print(f"Expected output is required for Factuality evaluation in preview.", file=sys.stderr)  
@@ -1111,18 +1119,18 @@ def preview():
                             output=generated_output,  
                             expected=expected_output  
                         )  
-                elif metric_name == "Kid Friendly":  
+                elif isinstance(evaluator, LLMClassifier):  
                     result = evaluator.eval(  
                         output=generated_output  
                     )  
-                elif metric_name in ("Context Relevancy", "Faithfulness"):  
+                elif isinstance(evaluator, (ContextRelevancy, Faithfulness)):  
                     result = evaluator.eval(  
                         input=input_prompt,  
                         output=generated_output,  
                         context=context_str  
                     )  
                 else:  
-                    print(f"Metric {metric_name} is not recognized.", file=sys.stderr)  
+                    print(f"Evaluator of type {type(evaluator)} for metric {metric_name} is not recognized.", file=sys.stderr)  
                     continue  
             else:  
                 print(f"Evaluator for {metric_name} is not callable or does not have an eval method.", file=sys.stderr)  
@@ -1315,6 +1323,139 @@ def list_indexes():
         success_message=success_message,  
         embedding_models=EMBEDDING_MODELS  # Pass embedding models to template  
     )  
+  
+@app.route('/manage_classifiers', methods=['GET', 'POST'])  
+def manage_classifiers():  
+    error_message = None  
+    success_message = None  
+  
+    # Define reasonable defaults  
+    default_classifier = {  
+        "name": "Sentiment Analyzer",  
+        "prompt_template": (  
+            "Given the following text:\n\n"  
+            "\"{{output}}\"\n\n"  
+            "Please rate the sentiment of this text as 'positive', 'neutral', or 'negative'."  
+        ),  
+        "choice_scores": {  
+            "positive": 1.0,  
+            "neutral": 0.5,  
+            "negative": 0.0  
+        },  
+        "use_cot": False,  
+        "model_deployment_name": DEFAULT_DEPLOYMENT_NAME,  # Assuming this is defined  
+        "temperature": 0.0  
+    }  
+  
+    if request.method == 'POST':  
+        action = request.form.get('action')  
+        if action == 'create_classifier':  
+            # Handle creation of new classifier  
+            name = request.form.get('name', '').strip() or default_classifier['name']  
+            prompt_template = request.form.get('prompt_template', '').strip() or default_classifier['prompt_template']  
+            choice_scores_str = request.form.get('choice_scores', '').strip() or json.dumps(default_classifier['choice_scores'])  
+            use_cot = request.form.get('use_cot') == 'on' if 'use_cot' in request.form else default_classifier['use_cot']  
+            model_deployment_name = request.form.get('model_deployment_name', '').strip() or default_classifier['model_deployment_name']  
+            temperature = float(request.form.get('temperature', default_classifier['temperature']))  
+  
+            # Parse choice_scores_str into a dictionary  
+            try:  
+                choice_scores = json.loads(choice_scores_str)  
+            except json.JSONDecodeError as e:  
+                error_message = f"Invalid JSON for choice scores: {e}"  
+            else:  
+                evaluator_config = {  
+                    "name": name,  
+                    "prompt_template": prompt_template,  
+                    "choice_scores": choice_scores,  
+                    "use_cot": use_cot,  
+                    "model_deployment_name": model_deployment_name,  
+                    "temperature": temperature,  
+                    "timestamp": datetime.datetime.utcnow(),  
+                }  
+  
+                # Check if a classifier with the same name exists  
+                existing_classifier = classifiers_collection.find_one({"name": name})  
+                if existing_classifier:  
+                    # Update existing classifier  
+                    classifiers_collection.update_one(  
+                        {"_id": existing_classifier["_id"]},  
+                        {"$set": evaluator_config}  
+                    )  
+                    success_message = f"Classifier '{name}' updated successfully."  
+                else:  
+                    # Insert new classifier  
+                    classifiers_collection.insert_one(evaluator_config)  
+                    success_message = f"Classifier '{name}' created successfully."  
+        elif action == 'delete_classifier':  
+            classifier_id = request.form.get('classifier_id')  
+            if classifier_id:  
+                classifiers_collection.delete_one({"_id": ObjectId(classifier_id)})  
+                success_message = "Classifier deleted successfully."  
+            else:  
+                error_message = "Classifier ID is required to delete a classifier."  
+  
+    # Fetch classifiers for display  
+    classifiers = list(classifiers_collection.find({}))  
+    for classifier in classifiers:  
+        classifier['_id'] = str(classifier['_id'])  
+        # Convert choice_scores to JSON string for display  
+        classifier['choice_scores_str'] = json.dumps(classifier.get('choice_scores', {}), indent=2)  
+  
+    # Fetch deployment names for the model selection dropdown  
+    deployment_names = DEPLOYMENT_NAMES  # Assuming this is defined in your existing code  
+    default_deployment = DEFAULT_DEPLOYMENT_NAME  
+  
+    current_year = datetime.datetime.utcnow().year  
+  
+    return render_template(  
+        'manage_classifiers.html',  
+        classifiers=classifiers,  
+        error_message=error_message,  
+        success_message=success_message,  
+        current_year=current_year,  
+        deployment_names=deployment_names,  
+        default_deployment=default_deployment,  
+        default_classifier=default_classifier  # Pass the defaults to the template  
+    )  
+  
+@app.route('/test_classifier/<string:classifier_id>', methods=['GET', 'POST'])  
+def test_classifier(classifier_id):  
+    # Fetch the classifier from the database  
+    classifier = classifiers_collection.find_one({"_id": ObjectId(classifier_id)})  
+    if not classifier:  
+        return "Classifier not found.", 404  
+  
+    # Prepare the classifier data for the template  
+    classifier['_id'] = str(classifier['_id'])  
+    classifier['choice_scores_str'] = json.dumps(classifier.get('choice_scores', {}), indent=2)  
+  
+    if request.method == 'POST':  
+        # Get the input text from the form  
+        input_text = request.form.get('input_text', '').strip()  
+        if not input_text:  
+            error_message = "Please provide input text."  
+            return render_template('test_classifier.html', classifier=classifier, error_message=error_message, current_year=datetime.datetime.utcnow().year)  
+  
+        else:  
+            # Now, we need to apply the classifier to the input text  
+            # Create an instance of LLMClassifier with the classifier's parameters  
+            evaluator = LLMClassifier(  
+                name=classifier['name'],  
+                prompt_template=classifier['prompt_template'],  
+                choice_scores=classifier['choice_scores'],  
+                use_cot=classifier['use_cot'],  
+                client=azure_client,  # Assuming azure_client is defined  
+                deployment_name=classifier.get('model_deployment_name', DEFAULT_DEPLOYMENT_NAME),  
+                temperature=classifier.get('temperature', 0.0)  
+            )  
+            # Now, evaluate the input_text  
+            result = evaluator.eval(output=input_text)  
+            # Prepare the result to display  
+            return render_template('test_classifier.html', classifier=classifier, input_text=input_text, result=result, current_year=datetime.datetime.utcnow().year)  
+    else:  
+        # GET method, show the form  
+        return render_template('test_classifier.html', classifier=classifier, current_year=datetime.datetime.utcnow().year)  
   
 if __name__ == '__main__':  
     app.run(debug=True)  

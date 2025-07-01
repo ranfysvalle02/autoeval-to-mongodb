@@ -1,0 +1,148 @@
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>Test Classifier</title>  
+    <!-- Include your CSS styles here -->  
+    <style>  
+        /* Include your CSS styles here or in a separate CSS file */  
+        body {  
+            margin: 0;  
+            font-family: 'Roboto', sans-serif;  
+            background-color: #f5f7fa;  
+            color: #333;  
+        }  
+        header, footer {  
+            background-color: #2c3e50;  
+            color: white;  
+            padding: 1em 0;  
+            text-align: center;  
+        }  
+        nav {  
+            background-color: #34495e;  
+            padding: 0.5em 0;  
+        }  
+        nav ul {  
+            list-style-type: none;  
+            text-align: center;  
+            margin: 0;  
+            padding: 0;  
+        }  
+        nav ul li {  
+            display: inline-block;  
+            margin: 0 1em;  
+        }  
+        nav ul li a {  
+            color: white;  
+            font-weight: bold;  
+            text-decoration: none;  
+        }  
+        main {  
+            padding: 2em;  
+            max-width: 800px;  
+            margin: 0 auto;  
+        }  
+        h2 {  
+            color: #2c3e50;  
+            margin-top: 1.5em;  
+        }  
+        .form-group {  
+            margin-bottom: 1em;  
+        }  
+        .form-group label {  
+            display: block;  
+            font-weight: bold;  
+            margin-bottom: 0.5em;  
+        }  
+        .form-group textarea {  
+            width: 100%;  
+            height: 150px;  
+            padding: 0.75em;  
+            border: 1px solid #ccd1d9;  
+            border-radius: 4px;  
+            font-size: 1em;  
+        }  
+        .btn {  
+            display: inline-block;  
+            padding: 0.5em 1em;  
+            margin: 0.2em 0;  
+            background-color: #3498db;  
+            color: white;  
+            border: none;  
+            border-radius: 4px;  
+            cursor: pointer;  
+            text-decoration: none;  
+            text-align: center;  
+        }  
+        .result {  
+            margin-top: 2em;  
+            padding: 1em;  
+            background-color: #ecf0f1;  
+            border-radius: 4px;  
+        }  
+        .error {  
+            color: #e74c3c;  
+            margin: 1em 0;  
+        }  
+    </style>  
+</head>  
+<body>  
+    <header>  
+        <h1>Test Classifier</h1>  
+    </header>  
+  
+    <!-- Navigation Menu -->  
+    <nav>  
+        <ul>  
+            <li><a href="{{ url_for('index') }}">Home</a></li>  
+            <li><a href="{{ url_for('list_indexes') }}">Manage Atlas Search Indexes</a></li>  
+            <li><a href="{{ url_for('manage_classifiers') }}">Manage Classifiers</a></li>  
+            <!-- Add more navigation items if needed -->  
+        </ul>  
+    </nav>  
+  
+    <main>  
+        <h2>Classifier: {{ classifier.name }}</h2>  
+        <p><strong>Model Deployment:</strong> {{ classifier.model_deployment_name }}</p>  
+        <p><strong>Use Chain-of-Thought:</strong> {{ 'Yes' if classifier.use_cot else 'No' }}</p>  
+        <p><strong>Temperature:</strong> {{ classifier.temperature }}</p>  
+        <h3>Prompt Template:</h3>  
+        <pre>{{ classifier.prompt_template }}</pre>  
+        <h3>Choice Scores:</h3>  
+        <pre>{{ classifier.choice_scores_str }}</pre>  
+  
+        {% if error_message %}  
+            <p class="error">{{ error_message }}</p>  
+        {% endif %}  
+  
+        <h2>Input Text</h2>  
+        <form method="post">  
+            <div class="form-group">  
+                <label for="input_text">Enter text to classify:</label>  
+                <textarea id="input_text" name="input_text" required>{{ input_text if request.method == 'POST' else '' }}</textarea>  
+            </div>  
+            <div class="form-actions">  
+                <button type="submit" class="btn">Classify</button>  
+            </div>  
+        </form>  
+  
+        {% if result %}  
+            <div class="result">  
+                <h2>Classification Result</h2>  
+                <p><strong>Score:</strong> {{ result.score }}</p>  
+                <p><strong>Chosen Category:</strong> {{ result.metadata.get('choice', 'N/A') }}</p>  
+                <p><strong>Reason:</strong> {{ result.reason }}</p>  
+                {% if result.metadata %}  
+                    <h3>Metadata:</h3>  
+                    <pre>{{ result.metadata | tojson(indent=2) }}</pre>  
+                {% endif %}  
+            </div>  
+        {% endif %}  
+  
+    </main>  
+  
+    <footer>  
+        <p>&copy; {{ current_year }} Your Company Name</p>  
+    </footer>  
+</body>  
+</html>  

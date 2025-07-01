@@ -598,7 +598,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <ul>        
             <li><a href="{{ url_for('index') }}">Home</a></li>        
             <li><a href="{{ url_for('list_indexes') }}"> Atlas Search Indexes</a></li>        
-            <!-- Add more navigation items if needed -->        
+            <li><a href="{{ url_for('manage_classifiers') }}">LLM Classifiers</a></li>    
         </ul>        
     </nav>        
   
@@ -692,18 +692,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     <textarea name="response_criteria" rows="4">{{ default_response_criteria }}</textarea>        
                 </div>        
   
-                <!-- Metric Selection -->        
-                <div class="form-group">        
-                    <label>Select Evaluation Metrics:</label>        
-                    <div>        
-                        {% for metric in available_metrics %}        
-                        <label>        
-                            <input type="checkbox" name="metrics" value="{{ metric.name }}" {% if metric.selected %}checked{% endif %}>        
-                            {{ metric.name }}        
-                        </label><br>        
-                        {% endfor %}        
-                    </div>        
-                </div>        
+                <!-- Metric Selection -->          
+                <div class="form-group">          
+                    <label>Select Evaluation Metrics:</label>          
+                    <div>          
+                        {% for metric in available_metrics %}          
+                        <label>          
+                            <input type="checkbox" name="metrics" value="{{ metric.name }}" {% if metric.selected %}checked{% endif %}>          
+                            {{ metric.name }}          
+                        </label><br>          
+                        {% endfor %}          
+                    </div>          
+                </div>          
   
                 <!-- Fields Selection -->        
                 <div class="form-group">        
