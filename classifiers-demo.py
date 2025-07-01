@@ -93,6 +93,43 @@ def classify_and_evaluate(text, name, prompt_template, choice_scores, model_depl
         logger.exception(f"Error during classification for '{name}'.")  
         return {"error": str(e)}  
   
+def store_evaluator_metadata(evaluator_config):  
+    """  
+    Stores or updates the evaluator metadata in the MongoDB 'evaluators' collection.  
+    """  
+    try:  
+        db = mongo_client["LLMClassifierEvalsDB"]  
+        collection = db["evaluators"]  
+        # Check if evaluator already exists based on unique name  
+        existing_evaluator = collection.find_one({"name": evaluator_config["name"]})  
+        if existing_evaluator:  
+            evaluator_id = existing_evaluator["_id"]  
+            # Compare existing configuration with the new one  
+            config_changed = False  
+            for key in evaluator_config:  
+                if existing_evaluator.get(key) != evaluator_config[key]:  
+                    config_changed = True  
+                    break  
+            if config_changed:  
+                # Update existing evaluator with new configuration  
+                collection.update_one(  
+                    {"_id": evaluator_id},  
+                    {"$set": evaluator_config}  
+                )  
+                logger.info(f"Updated evaluator '{evaluator_config['name']}' with ID: {evaluator_id}")  
+            else:  
+                logger.info(f"Evaluator '{evaluator_config['name']}' already exists with ID: {evaluator_id} and has the same configuration.")  
+            return evaluator_id  
+        else:  
+            # Insert new evaluator metadata  
+            result = collection.insert_one(evaluator_config)  
+            evaluator_id = result.inserted_id  
+            logger.info(f"Stored new evaluator '{evaluator_config['name']}' with ID: {evaluator_id}")  
+            return evaluator_id  
+    except PyMongoError:  
+        logger.exception("Failed to store evaluator metadata in MongoDB.")  
+        return None  
+  
 def store_evaluation_result(collection_name, data):  
     """  
     Stores the evaluation result in the specified MongoDB collection.  
@@ -113,10 +150,9 @@ def main():
     try:  
         initialize_clients()  
   
-        # Define test cases  
-        test_cases = [  
+        # Define evaluator configurations  
+        evaluators = [  
             {  
-                "text": "This product is absolutely amazing! I love it.",  
                 "name": "Sentiment Analyzer",  
                 "prompt_template": (  
                     "Given the following text:\n\n"  
@@ -124,11 +160,9 @@ def main():
                     "Please rate the sentiment of this text as 'positive', 'negative', or 'neutral'."  
                 ),  
                 "choice_scores": {"positive": 1.0, "neutral": 0.5, "negative": 0.0},  
-                "collection_name": "sentiment_evals",  
                 "use_cot": False  
             },  
             {  
-                "text": "Claim your free prize now! Click this suspicious link: example.com/free-money",  
                 "name": "Spam Detector",  
                 "prompt_template": (  
                     "Given the following email content:\n\n"  
@@ -136,11 +170,9 @@ def main():
                     "Is this email 'spam' or 'not spam'? Explain your reasoning first."  
                 ),  
                 "choice_scores": {"spam": 0.0, "not spam": 1.0},  
-                "collection_name": "spam_evals",  
                 "use_cot": True  
             },  
             {  
-                "text": "My internet is not working. I need technical assistance.",  
                 "name": "Query Router",  
                 "prompt_template": (  
                     "Given the customer query below:\n\n"  
@@ -148,34 +180,72 @@ def main():
                     "Please route it to the correct department: 'Technical Support', 'Billing', or 'General Inquiry'."  
                 ),  
                 "choice_scores": {"Technical Support": 1.0, "Billing": 0.5, "General Inquiry": 0.2},  
-                "collection_name": "query_routing_evals",  
                 "use_cot": False  
             }  
         ]  
   
+        # Define test cases and associate them with evaluators  
+        test_cases = [  
+            {  
+                "text": "This product is absolutely amazing! I love it.",  
+                "collection_name": "sentiment_evals",  
+                "evaluator_name": "Sentiment Analyzer"  
+            },  
+            {  
+                "text": "Claim your free prize now! Click this suspicious link: example.com/free-money",  
+                "collection_name": "spam_evals",  
+                "evaluator_name": "Spam Detector"  
+            },  
+            {  
+                "text": "My internet is not working. I need technical assistance.",  
+                "collection_name": "query_routing_evals",  
+                "evaluator_name": "Query Router"  
+            }  
+        ]  
+  
+        # Store evaluator metadata and get evaluator IDs  
+        evaluator_ids = {}  
+        for evaluator in evaluators:  
+            evaluator_id = store_evaluator_metadata(evaluator)  
+            if evaluator_id:  
+                evaluator_ids[evaluator["name"]] = evaluator_id  
+            else:  
+                logger.error(f"Failed to store or retrieve evaluator ID for '{evaluator['name']}'.")  
+                continue  
+  
         # Process each test case  
         for test in test_cases:  
-            logger.info(f"Processing: {test['name']}")  
+            evaluator_name = test["evaluator_name"]  
+            evaluator = next((e for e in evaluators if e["name"] == evaluator_name), None)  
+            evaluator_id = evaluator_ids.get(evaluator_name)  
+  
+            if evaluator_id is None or evaluator is None:  
+                logger.error(f"Evaluator '{evaluator_name}' not found. Skipping test case.")  
+                continue  
+  
+            logger.info(f"Processing: {evaluator_name}")  
+  
             eval_result = classify_and_evaluate(  
                 text=test["text"],  
-                name=test["name"],  
-                prompt_template=test["prompt_template"],  
-                choice_scores=test["choice_scores"],  
+                name=evaluator["name"],  
+                prompt_template=evaluator["prompt_template"],  
+                choice_scores=evaluator["choice_scores"],  
                 model_deployment_name=OPENAI_AZURE_DEPLOYMENT_NAME,  
-                use_cot=test["use_cot"]  
+                use_cot=evaluator["use_cot"]  
             )  
   
             if eval_result and "score" in eval_result:  
-                logger.info(f"Classification Result for '{test['name']}': {eval_result['value']}")  
+                logger.info(f"Classification Result for '{evaluator['name']}': {eval_result['value']}")  
                 data_to_store = {  
                     "original_text": test["text"],  
-                    "evaluator_name": test["name"],  
+                    "evaluator_id": evaluator_id,  
+                    "evaluator_name": evaluator["name"],  
                     "autoevals_result": eval_result,  
                     "timestamp": datetime.utcnow()  
                 }  
                 store_evaluation_result(test["collection_name"], data_to_store)  
             else:  
-                logger.error(f"Failed to classify '{test['name']}': {eval_result.get('error')}")  
+                logger.error(f"Failed to classify '{evaluator['name']}': {eval_result.get('error')}")  
   
     except Exception as e:  
         logger.exception("An unexpected error occurred during execution.")  
