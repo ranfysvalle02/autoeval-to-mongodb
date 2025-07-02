@@ -1,859 +1,938 @@
-<!DOCTYPE html>        
-<html lang="en">        
-<head>        
-    <meta charset="UTF-8">        
-    <title>RAG Task with Metrics Selection</title>        
-    <!-- Include Google Fonts -->        
-    <link rel="preconnect" href="https://fonts.googleapis.com">        
-    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">        
-  
-    <!-- Include Font Awesome for Icons -->        
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>        
-  
-    <!-- Embedded CSS Styles -->        
-    <style>        
-        /* Global Styles */        
-        body {        
-            margin: 0;        
-            font-family: 'Roboto', sans-serif;        
-            background-color: #f5f7fa;        
-            color: #333;        
-        }        
-  
-        header, footer {        
-            background-color: #2c3e50;        
-            color: white;        
-            padding: 1em 0;        
-            text-align: center;        
-            position: sticky;        
-            top: 0;        
-            z-index: 1000;        
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);        
-        }        
-  
-        header h1 {        
-            margin: 0;        
-            font-weight: normal;        
-        }        
-  
-        main {        
-            padding: 2em;        
-            max-width: 1200px;        
-            margin: 0 auto;        
-        }        
-  
-        h2 {        
-            color: #2c3e50;        
-        }        
-  
-        a {        
-            color: #3498db;        
-            text-decoration: none;        
-        }        
-  
-        a:hover {        
-            text-decoration: underline;        
-        }        
-  
-        /* Navigation Styles */        
-        nav {        
-            background-color: #34495e;        
-            padding: 0.5em 0;        
-        }        
-  
-        nav ul {        
-            list-style-type: none;        
-            margin: 0;        
-            padding: 0;        
-            text-align: center;        
-        }        
-  
-        nav ul li {        
-            display: inline-block;        
-            margin: 0 1em;        
-        }        
-  
-        nav ul li a {        
-            color: white;        
-            font-weight: bold;        
-        }        
-  
-        nav ul li a:hover {        
-            text-decoration: underline;        
-        }        
-  
-        /* Button Styles */        
-        .btn {        
-            display: inline-block;        
-            padding: 0.5em 1em;        
-            margin: 0.2em 0;        
-            background-color: #3498db;        
-            color: white;        
-            border: none;        
-            border-radius: 4px;        
-            cursor: pointer;        
-            transition: background-color 0.3s ease, transform 0.1s ease;        
-            text-decoration: none;        
-            text-align: center;        
-        }        
-  
-        .btn:hover {        
-            background-color: #2980b9;        
-            transform: translateY(-2px);        
-        }        
-  
-        .btn:active {        
-            transform: translateY(0);        
-        }        
-  
-        .btn.danger {        
-            background-color: #e74c3c;        
-        }        
-  
-        .btn.danger:hover {        
-            background-color: #c0392b;        
-        }        
-  
-        .btn.primary {        
-            background-color: #1abc9c;        
-        }        
-  
-        .btn.primary:hover {        
-            background-color: #16a085;        
-        }        
-  
-        .btn.icon {        
-            padding: 0.5em;        
-            width: 2.5em;        
-            height: 2.5em;        
-            text-align: center;        
-        }        
-  
-        .btn.icon i {        
-            margin: 0;        
-        }        
-  
-        .form-group {        
-            margin-bottom: 1.5em;        
-        }        
-  
-        .form-group label {        
-            display: block;        
-            font-weight: bold;        
-            margin-bottom: 0.5em;        
-        }        
-  
-        .form-group input[type="text"],        
-        .form-group textarea,        
-        .form-group select {        
-            width: 100%;        
-            padding: 0.75em;        
-            border: 1px solid #ccd1d9;        
-            border-radius: 4px;        
-            transition: border-color 0.3s ease, box-shadow 0.3s ease;        
-            font-size: 1em;        
-        }        
-  
-        .form-group input[type="text"]:focus,        
-        .form-group textarea:focus,        
-        .form-group select:focus {        
-            border-color: #3498db;        
-            box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1);        
-            outline: none;        
-        }        
-  
-        .form-actions {        
-            margin-top: 1em;        
-        }        
-  
-        .form-actions button {        
-            margin-right: 0.5em;        
-        }        
-  
-        .table-responsive {        
-            overflow-x: auto;        
-            margin-bottom: 1.5em;        
-        }        
-  
-        table {        
-            width: 100%;        
-            border-collapse: collapse;        
-            background-color: white;        
-            margin-bottom: 1em;        
-        }        
-  
-        table thead {        
-            background-color: #34495e;        
-            color: white;        
-            text-align: left;        
-        }        
-  
-        table th, table td {        
-            padding: 1em;        
-            border-bottom: 1px solid #ddd;        
-            vertical-align: middle;        
-        }        
-  
-        table tbody tr {        
-            transition: background-color 0.3s ease;        
-        }        
-  
-        table tbody tr:hover {        
-            background-color: #f9f9f9;        
-        }        
-  
-        table input[type="text"] {        
-            width: 100%;        
-            padding: 0.5em;        
-            border: 1px solid #ccd1d9;        
-            border-radius: 4px;        
-            font-size: 0.95em;        
-        }        
-  
-        /* Modal Styles */        
-        .modal {        
-            display: none; /* Hidden by default */        
-            position: fixed; /* Stay in place */        
-            z-index: 10000; /* Sit on top */        
-            left: 0;        
-            top: 0;        
-            width: 100%; /* Full width */        
-            height: 100%; /* Full height */        
-            overflow: auto; /* Enable scroll if needed */        
-            background-color: rgba(0,0,0,0.5); /* Black w/ opacity */        
-        }        
-  
-        .modal-content {        
-            background-color: #fefefe;        
-            margin: 5% auto; /* Centered vertically and horizontally */        
-            padding: 2em;        
-            border: 1px solid #888;        
-            width: 80%;        
-            max-width: 800px;        
-            border-radius: 5px;        
-            position: relative;        
-            overflow-y: auto;        
-            max-height: 80vh;        
-        }        
-  
-        .modal-content .close {        
-            color: #aaa;        
-            position: absolute;        
-            right: 1em;        
-            top: 1em;        
-            font-size: 28px;        
-            font-weight: bold;        
-            text-decoration: none;        
-        }        
-  
-        .modal-content .close:hover,        
-        .modal-content .close:focus {        
-            color: black;        
-            text-decoration: none;        
-            cursor: pointer;        
-        }        
-  
-        /* Loading Spinner Styles */        
-        .spinner {        
-            margin: 50px auto;        
-            width: 50px;        
-            height: 50px;        
-            position: relative;        
-            text-align: center;        
-            animation: rotate 2.0s infinite linear;        
-        }        
-  
-        .spinner > div {        
-            width: 18px;        
-            height: 18px;        
-            background-color: #3498db;        
-  
-            border-radius: 100%;        
-            display: inline-block;        
-            position: absolute;        
-            animation: bounce 2.0s infinite ease-in-out;        
-        }        
-  
-        .spinner .bounce1 {        
-            top: 0;        
-            animation-delay: -0.32s;        
-        }        
-  
-        .spinner .bounce2 {        
-            top: auto;        
-            bottom: 0;        
-            animation-delay: -0.16s;        
-        }        
-  
-        @keyframes rotate { 100% { transform: rotate(360deg); } }        
-        @keyframes bounce {        
-            0%, 80%, 100% { transform: scale(0); }        
-            40% { transform: scale(1.0); }        
-        }        
-  
-        .error {        
-            color: #e74c3c;        
-            font-size: 0.9em;        
-        }        
-  
-        /* Responsive Design */        
-        @media (max-width: 768px) {        
-            main {        
-                padding: 1em;        
-            }        
-            .modal-content {        
-                width: 90%;        
-            }        
-            .form-group input[type="text"],        
-            .form-group textarea,        
-            .form-group select {        
-                font-size: 0.9em;        
-            }        
-            table th, table td {        
-                padding: 0.5em;        
-            }        
-            .modal-content {        
-                width: 95%;        
-            }        
-        }        
-  
-        /* Hide the loading indicator by default */        
-        #loading {        
-            display: none;        
-            text-align: center;        
-        }        
-  
-        /* Collapsible Button Styles */        
-        .collapsible {        
-            background-color: #f1f1f1;        
-            color: #2c3e50;        
-            cursor: pointer;        
-            padding: 0.5em 1em;        
-            width: 100%;        
-            border: none;        
-            text-align: left;        
-            outline: none;        
-            font-size: 1em;        
-            transition: background-color 0.3s ease;        
-            border-radius: 5px;        
-        }        
-  
-        .collapsible:hover {        
-            background-color: #e2e2e2;        
-        }        
-  
-        .collapsible:after {        
-            content: '\002B';        
-            font-size: 1em;        
-            color: #777;        
-            float: right;        
-            margin-left: 5px;        
-        }        
-  
-        .collapsible.active:after {        
-            content: "\2212";        
-        }        
-  
-        .content {        
-            padding: 0 1em;        
-            max-height: 0;        
-            overflow: hidden;        
-            transition: max-height 0.3s ease-out, padding 0.3s ease-out;        
-            background-color: #fafafa;        
-            border-left: 1px solid #ddd;        
-            border-right: 1px solid #ddd;        
-            border-bottom: 1px solid #ddd;        
-        }        
-    </style>        
-  
-    <!-- Embedded JavaScript -->        
-    <script>        
-        function showLoading() {        
-            document.getElementById('loading').style.display = 'block';        
-        }        
-  
-        function submitPreview(idx) {        
-            // Open the modal and show loading indicator        
-            openPreviewModal();        
-  
-            // Gather the form data        
-            var formData = new FormData();        
-            var testCaseCountInput = document.getElementsByName('test_case_count')[0];        
-            var testCaseCount = testCaseCountInput.value;        
-  
-            formData.append('test_case_count', testCaseCount);        
-  
-            // Append deployment_names        
-            var deploymentNameFields = document.getElementsByName('deployment_names');        
-            for (var i = 0; i < deploymentNameFields.length; i++) {        
-                if (deploymentNameFields[i].checked) {        
-                    formData.append('deployment_names', deploymentNameFields[i].value);        
-                }        
-            }        
-  
-            // Append idx_meta_id        
-            var idxMetaId = document.getElementById('idx_meta_id').value;        
-            formData.append('idx_meta_id', idxMetaId);        
-  
-            // Append response_criteria        
-            var responseCriteriaField = document.getElementsByName('response_criteria')[0];        
-            formData.append('response_criteria', responseCriteriaField.value);        
-  
-            // Append system_prompt_template        
-            var systemPromptField = document.getElementsByName('system_prompt_template')[0];        
-            formData.append('system_prompt_template', systemPromptField.value);        
-  
-            // Append user_prompt_template        
-            var userPromptField = document.getElementsByName('user_prompt_template')[0];        
-            formData.append('user_prompt_template', userPromptField.value);        
-  
-            // Append selected metrics        
-            var metricCheckboxes = document.getElementsByName('metrics');        
-            for (var i = 0; i < metricCheckboxes.length; i++) {        
-                if (metricCheckboxes[i].checked) {        
-                    formData.append('metrics', metricCheckboxes[i].value);        
-                }        
-            }        
-  
-            // Append the specific test case input and expected output        
-            var inputPromptField = document.getElementsByName('input_prompt_' + idx)[0];        
-            var expectedOutputField = document.getElementsByName('expected_output_' + idx)[0];        
-            formData.append('input_prompt_' + idx, inputPromptField.value);        
-            formData.append('expected_output_' + idx, expectedOutputField.value);        
-  
-            // Add test_case_idx        
-            formData.append('test_case_idx', idx);        
-  
-            // Append selected fields        
-            var fieldCheckboxes = document.getElementsByName('fields');        
-            for (var i = 0; i < fieldCheckboxes.length; i++) {        
-                if (fieldCheckboxes[i].checked) {        
-                    formData.append('fields', fieldCheckboxes[i].value);        
-                }        
-            }        
-  
-            // Make an AJAX request to /preview        
-            var xhr = new XMLHttpRequest();        
-            xhr.open('POST', '/preview', true);        
-            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');        
-  
-            xhr.onload = function() {        
-                if (xhr.status === 200) {        
-                    // Display the preview content in the modal        
-                    document.getElementById('previewContent').innerHTML = xhr.responseText;        
-                    // Initialize the collapsible elements        
-                    initializeCollapsibles();        
-                } else {        
-                    document.getElementById('previewContent').innerHTML = '<p class="error">An error occurred while fetching the preview.</p>';        
-                }        
-            };        
-  
-            xhr.onerror = function() {        
-                document.getElementById('previewContent').innerHTML = '<p class="error">An error occurred while fetching the preview.</p>';        
-            };        
-  
-            xhr.send(formData);        
-        }        
-  
-        function openPreviewModal() {        
-            document.getElementById('previewModal').style.display = 'block';        
-            // Show loading indicator        
-            document.getElementById('previewContent').innerHTML = '<div class="spinner"><div class="bounce1"></div><div class="bounce2"></div></div><p style="text-align:center;">Loading preview...</p>';        
-        }        
-  
-        function closePreviewModal() {        
-            document.getElementById('previewModal').style.display = 'none';        
-            document.getElementById('previewContent').innerHTML = '';        
-        }        
-  
-        function removeTestCase(testCaseId) {        
-            var confirmation = confirm("Are you sure you want to remove this test case?");        
-            if (confirmation) {        
-                var form = document.getElementById('remove_test_case_form');        
-                var input = document.getElementById('test_case_id_to_remove');        
-                input.value = testCaseId;        
-                form.submit();        
-            }        
-        }        
-  
-        function openAddTestCaseModal() {        
-            document.getElementById('addTestCaseModal').style.display = 'block';        
-        }        
-  
-        function closeAddTestCaseModal() {        
-            document.getElementById('addTestCaseModal').style.display = 'none';        
-            clearAddTestCaseForm();        
-        }        
-  
-        function clearAddTestCaseForm() {        
-            document.getElementById('new_input_prompt').value = '';        
-            document.getElementById('new_expected_output').value = '';        
-            document.getElementById('addTestCaseError').innerText = '';        
-        }        
-  
-        function validateAddTestCaseForm() {        
-            var inputPrompt = document.getElementById('new_input_prompt').value.trim();        
-            var errorElement = document.getElementById('addTestCaseError');        
-  
-            if (inputPrompt === '') {        
-                errorElement.innerText = 'Input Prompt is required.';        
-                return false;        
-            }        
-  
-            return true;        
-        }        
-  
-        // Function to initialize collapsible elements        
-        function initializeCollapsibles() {        
-            var coll = document.getElementById('previewContent').getElementsByClassName("collapsible");        
-            for (var i = 0; i < coll.length; i++) {        
-                coll[i].addEventListener("click", function() {        
-                    this.classList.toggle("active");        
-                    // Assuming the button is inside an h4, and the content div is the next sibling after h4        
-                    var content = this.parentElement.nextElementSibling;        
-                    if (content && content.classList.contains('content')) {        
-                        if (content.style.maxHeight){        
-                            content.style.maxHeight = null;        
-                            content.style.padding = null;        
-                        } else {        
-                            content.style.maxHeight = content.scrollHeight + "px";        
-                            content.style.padding = "1em 0";        
-                        }        
-                    }        
-                });        
-            }        
-        }        
-  
-        // Close modal when clicking outside of it        
-        window.onclick = function(event) {        
-            var modal = document.getElementById('addTestCaseModal');        
-            var previewModal = document.getElementById('previewModal');        
-            if (event.target == modal) {        
-                closeAddTestCaseModal();        
-            }        
-            if (event.target == previewModal) {        
-                closePreviewModal();        
-            }        
-        };        
-  
-        // Function to load fields based on selected index configuration        
-        function loadFields() {  
-            var idxMetaId = document.getElementById('idx_meta_id').value;  
-            var fieldsContainer = document.getElementById('fields_container');  
-        
-            fieldsContainer.innerHTML = ''; // Clear previous fields  
-        
-            if (idxMetaId !== '') {  
-                var xhr = new XMLHttpRequest();  
-                xhr.open('POST', '/get_fields', true);  
-                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');  
-                xhr.onload = function() {  
-                    if (xhr.status === 200) {  
-                        var data = JSON.parse(xhr.responseText);  
-                        if (data.fields && data.fields.length > 0) {  
-                            data.fields.sort(); // Optional: sort fields alphabetically  
-                            data.fields.forEach(function(field) {  
-                                var label = document.createElement('label');  
-                                var checkbox = document.createElement('input');  
-                                checkbox.type = 'checkbox';  
-                                checkbox.name = 'fields';  
-                                checkbox.value = field.name;  
-                                checkbox.checked = false; // Uncheck all fields by default  
-                                label.appendChild(checkbox);  
-                                label.appendChild(document.createTextNode(' ' + field.name));  
-                                fieldsContainer.appendChild(label);  
-                                fieldsContainer.appendChild(document.createElement('br'));  
-                            });  
-                        } else {  
-                            fieldsContainer.innerHTML = '<p>No fields found in the selected collection.</p>';  
-                        }  
-                    } else {  
-                        fieldsContainer.innerHTML = '<p>Error loading fields.</p>';  
-                    }  
-                };  
-                xhr.onerror = function() {  
-                    fieldsContainer.innerHTML = '<p>Error loading fields.</p>';  
-                };  
-                // Send idx_meta_id to /get_fields route  
-                xhr.send('idx_meta_id=' + encodeURIComponent(idxMetaId));  
-            } else {  
-                fieldsContainer.innerHTML = '<p>Please select an index configuration to load fields.</p>';  
-            }  
-        }  
-  
-// Initialize event listener on page load  
-document.addEventListener('DOMContentLoaded', function() {  
-    document.getElementById('idx_meta_id').addEventListener('change', loadFields);  
-});      
-  
-    </script>        
-</head>        
-<body>        
-    <header>        
-        <h1>RAG Task with Metrics Selection</h1>        
-    </header>        
-  
-    <!-- Navigation Menu -->        
-    <nav>        
-        <ul>        
-            <li><a href="{{ url_for('index') }}">Home</a></li>        
-            <li><a href="{{ url_for('list_indexes') }}"> Atlas Search Indexes</a></li>        
-            <li><a href="{{ url_for('manage_evaluators') }}">Custom Evaluators</a></li>    
-        </ul>        
-    </nav>        
-  
-    <main>        
-        <!-- Modal for adding a new test case -->        
-        <div id="addTestCaseModal" class="modal">        
-            <div class="modal-content">        
-                <a href="javascript:void(0);" class="close" onclick="closeAddTestCaseModal()">&times;</a>        
-                <h2>Add New Test Case</h2>        
-                <form id="add_test_case_form" method="post" action="/add_test_case" onsubmit="return validateAddTestCaseForm();">        
-                    <div class="form-group">        
-                        <label for="new_input_prompt">Input Prompt:</label>        
-                        <input type="text" id="new_input_prompt" name="new_input_prompt" required>        
-                    </div>        
-                    <div class="form-group">        
-                        <label for="new_expected_output">Expected Output (Optional):</label>        
-                        <input type="text" id="new_expected_output" name="new_expected_output">        
-                    </div>        
-                    <div class="error" id="addTestCaseError"></div>        
-                    <div class="form-actions">        
-                        <button type="submit" class="btn primary">Add Test Case</button>        
-                        <button type="button" class="btn" onclick="closeAddTestCaseModal()">Cancel</button>        
-                    </div>        
-                </form>        
-            </div>        
-        </div>        
-  
-        <!-- Modal for previewing a test case -->        
-        <div id="previewModal" class="modal">        
-            <div class="modal-content">        
-                <a href="javascript:void(0);" class="close" onclick="closePreviewModal()">&times;</a>        
-                <h2>Preview Result</h2>        
-                <div id="previewContent">        
-                    <!-- Preview content or loading indicator will be injected here -->        
-                </div>        
-                <div class="form-actions">        
-                    <button type="button" class="btn" onclick="closePreviewModal()"><i class="fa fa-times"></i> Close</button>        
-                </div>        
-            </div>        
-        </div>        
-  
-        <!-- Form for removing a test case -->        
-        <form id="remove_test_case_form" method="post" action="/remove_test_case" style="display: none;">        
-            <input type="hidden" name="test_case_id_to_remove" id="test_case_id_to_remove">        
-        </form>        
-  
-        <section class="test-dataset">        
-            <h2>Test Dataset Evaluation</h2>        
-            <form id="test_dataset_form" method="post">        
-                <!-- Deployment Selection -->        
-                <div class="form-group">        
-                    <label>Select Deployment Names:</label>        
-                    <div>        
-                        {% for name in deployment_names %}        
-                        <label>        
-                            <input type="checkbox" name="deployment_names" value="{{ name }}" {% if name == default_deployment %}checked{% endif %}>        
-                            {{ name }}        
-                        </label><br>        
-                        {% endfor %}        
-                    </div>        
-                </div>        
-  
-                <!-- Index Configuration Selection -->        
-                <div class="form-group">        
-                    <label for="idx_meta_id">Select Index Configuration:</label>        
-                    <select id="idx_meta_id" name="idx_meta_id" required>        
-                        <option value="">-- Select Index Configuration --</option>        
-                        {% for idx_meta in idx_meta_entries %}        
-                        <option value="{{ idx_meta['_id'] }}">        
-                            {{ idx_meta['source_db'] }}.{{ idx_meta['source_collection'] }} - {{ idx_meta['embedding_model_name'] }} - {{ idx_meta['index_name'] }}        
-                        </option>        
-                        {% endfor %}        
-                    </select>        
-                </div>        
-  
-                <!-- System Prompt Template Input -->        
-                <div class="form-group">        
-                    <label for="system_prompt_template">System Prompt Template:</label>        
-                    <textarea name="system_prompt_template" rows="6">{{ default_system_prompt }}</textarea>        
-                </div>        
-  
-                <!-- User Prompt Template Input -->        
-                <div class="form-group">        
-                    <label for="user_prompt_template">User Prompt Template:</label>        
-                    <textarea name="user_prompt_template" rows="6">{{ default_user_prompt }}</textarea>        
-                </div>        
-  
-                <!-- Response Criteria Input -->        
-                <div class="form-group">        
-                    <label for="response_criteria">Response Criteria:</label>        
-                    <textarea name="response_criteria" rows="4">{{ default_response_criteria }}</textarea>        
-                </div>        
-  
-                <!-- Metric Selection -->          
+]<!DOCTYPE html>          
+<html lang="en">          
+<head>          
+    <meta charset="UTF-8">          
+    <title>RAG Task with Metrics Selection</title>          
+    <!-- Include Google Fonts -->          
+    <link rel="preconnect" href="https://fonts.googleapis.com">          
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">          
+  
+    <!-- Include Font Awesome for Icons -->          
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>          
+  
+    <!-- Embedded CSS Styles -->          
+    <style>          
+        /* Global Styles */          
+        body {          
+            margin: 0;          
+            font-family: 'Roboto', sans-serif;          
+            background-color: #f5f7fa;          
+            color: #333;          
+        }          
+  
+        header, footer {          
+            background-color: #2c3e50;          
+            color: white;          
+            padding: 1em 0;          
+            text-align: center;          
+            position: sticky;          
+            top: 0;          
+            z-index: 1000;          
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);          
+        }          
+  
+        header h1 {          
+            margin: 0;          
+            font-weight: normal;          
+        }          
+  
+        main {          
+            padding: 2em;          
+            max-width: 1200px;          
+            margin: 0 auto;          
+        }          
+  
+        h2 {          
+            color: #2c3e50;          
+        }          
+  
+        a {          
+            color: #3498db;          
+            text-decoration: none;          
+        }          
+  
+        a:hover {          
+            text-decoration: underline;          
+        }          
+  
+        /* Navigation Styles */          
+        nav {          
+            background-color: #34495e;          
+            padding: 0.5em 0;          
+        }          
+  
+        nav ul {          
+            list-style-type: none;          
+            margin: 0;          
+            padding: 0;          
+            text-align: center;          
+        }          
+  
+        nav ul li {          
+            display: inline-block;          
+            margin: 0 1em;          
+        }          
+  
+        nav ul li a {          
+            color: white;          
+            font-weight: bold;          
+        }          
+  
+        nav ul li a:hover {          
+            text-decoration: underline;          
+        }          
+  
+        /* Button Styles */          
+        .btn {          
+            display: inline-block;          
+            padding: 0.5em 1em;          
+            margin: 0.2em 0;          
+            background-color: #3498db;          
+            color: white;          
+            border: none;          
+            border-radius: 4px;          
+            cursor: pointer;          
+            transition: background-color 0.3s ease, transform 0.1s ease;          
+            text-decoration: none;          
+            text-align: center;          
+        }          
+  
+        .btn:hover {          
+            background-color: #2980b9;          
+            transform: translateY(-2px);          
+        }          
+  
+        .btn:active {          
+            transform: translateY(0);          
+        }          
+  
+        .btn.danger {          
+            background-color: #e74c3c;          
+        }          
+  
+        .btn.danger:hover {          
+            background-color: #c0392b;          
+        }          
+  
+        .btn.primary {          
+            background-color: #1abc9c;          
+        }          
+  
+        .btn.primary:hover {          
+            background-color: #16a085;          
+        }          
+  
+        .btn.icon {          
+            padding: 0.5em;          
+            width: 2.5em;          
+            height: 2.5em;          
+            text-align: center;          
+        }          
+  
+        .btn.icon i {          
+            margin: 0;          
+        }          
+  
+        .form-group {          
+            margin-bottom: 1.5em;          
+        }          
+  
+        .form-group label {          
+            display: block;          
+            font-weight: bold;          
+            margin-bottom: 0.5em;          
+        }          
+  
+        .form-group input[type="text"],          
+        .form-group textarea,          
+        .form-group select {          
+            width: 100%;          
+            padding: 0.75em;          
+            border: 1px solid #ccd1d9;          
+            border-radius: 4px;          
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;          
+            font-size: 1em;          
+        }          
+  
+        .form-group input[type="text"]:focus,          
+        .form-group textarea:focus,          
+        .form-group select:focus {          
+            border-color: #3498db;          
+            box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1);          
+            outline: none;          
+        }          
+  
+        .form-actions {          
+            margin-top: 1em;          
+        }          
+  
+        .form-actions button {          
+            margin-right: 0.5em;          
+        }          
+  
+        .table-responsive {          
+            overflow-x: auto;          
+            margin-bottom: 1.5em;          
+        }          
+  
+        table {          
+            width: 100%;          
+            border-collapse: collapse;          
+            background-color: white;          
+            margin-bottom: 1em;          
+        }          
+  
+        table thead {          
+            background-color: #34495e;          
+            color: white;          
+            text-align: left;          
+        }          
+  
+        table th, table td {          
+            padding: 1em;          
+            border-bottom: 1px solid #ddd;          
+            vertical-align: middle;          
+        }          
+  
+        table tbody tr {          
+            transition: background-color 0.3s ease;          
+        }          
+  
+        table tbody tr:hover {          
+            background-color: #f9f9f9;          
+        }          
+  
+        table input[type="text"] {          
+            width: 100%;          
+            padding: 0.5em;          
+            border: 1px solid #ccd1d9;          
+            border-radius: 4px;          
+            font-size: 0.95em;          
+        }          
+  
+        /* Modal Styles */          
+        .modal {          
+            display: none; /* Hidden by default */          
+            position: fixed; /* Stay in place */          
+            z-index: 10000; /* Sit on top */          
+            left: 0;          
+            top: 0;          
+            width: 100%; /* Full width */          
+            height: 100%; /* Full height */          
+            overflow: auto; /* Enable scroll if needed */          
+            background-color: rgba(0,0,0,0.5); /* Black w/ opacity */          
+        }          
+  
+        .modal-content {          
+            background-color: #fefefe;          
+            margin: 5% auto; /* Centered vertically and horizontally */          
+            padding: 2em;          
+            border: 1px solid #888;          
+            width: 80%;          
+            max-width: 800px;          
+            border-radius: 5px;          
+            position: relative;          
+            overflow-y: auto;          
+            max-height: 80vh;          
+        }          
+  
+        .modal-content .close {          
+            color: #aaa;          
+            position: absolute;          
+            right: 1em;          
+            top: 1em;          
+            font-size: 28px;          
+            font-weight: bold;          
+            text-decoration: none;          
+        }          
+  
+        .modal-content .close:hover,          
+        .modal-content .close:focus {          
+            color: black;          
+            text-decoration: none;          
+            cursor: pointer;          
+        }          
+  
+        /* Loading Spinner Styles */          
+        .spinner {          
+            margin: 50px auto;          
+            width: 50px;          
+            height: 50px;          
+            position: relative;          
+            text-align: center;          
+            animation: rotate 2.0s infinite linear;          
+        }          
+  
+        .spinner > div {          
+            width: 18px;          
+            height: 18px;          
+            background-color: #3498db;          
+  
+            border-radius: 100%;          
+            display: inline-block;          
+            position: absolute;          
+            animation: bounce 2.0s infinite ease-in-out;          
+        }          
+  
+        .spinner .bounce1 {          
+            top: 0;          
+            animation-delay: -0.32s;          
+        }          
+  
+        .spinner .bounce2 {          
+            top: auto;          
+            bottom: 0;          
+            animation-delay: -0.16s;          
+        }          
+  
+        @keyframes rotate { 100% { transform: rotate(360deg); } }          
+        @keyframes bounce {          
+            0%, 80%, 100% { transform: scale(0); }          
+            40% { transform: scale(1.0); }          
+        }          
+  
+        .error {          
+            color: #e74c3c;          
+            font-size: 0.9em;          
+        }          
+  
+        /* Responsive Design */          
+        @media (max-width: 768px) {          
+            main {          
+                padding: 1em;          
+            }          
+            .modal-content {          
+                width: 90%;          
+            }          
+            .form-group input[type="text"],          
+            .form-group textarea,          
+            .form-group select {          
+                font-size: 0.9em;          
+            }          
+            table th, table td {          
+                padding: 0.5em;          
+            }          
+            .modal-content {          
+                width: 95%;          
+            }          
+        }          
+  
+        /* Hide the loading indicator by default */          
+        #loading {          
+            display: none;          
+            text-align: center;          
+        }          
+  
+        /* Collapsible Button Styles */          
+        .collapsible {          
+            background-color: #f1f1f1;          
+            color: #2c3e50;          
+            cursor: pointer;          
+            padding: 0.5em 1em;          
+            width: 100%;          
+            border: none;          
+            text-align: left;          
+            outline: none;          
+            font-size: 1em;          
+            transition: background-color 0.3s ease;          
+            border-radius: 5px;          
+        }          
+  
+        .collapsible:hover {          
+            background-color: #e2e2e2;          
+        }          
+  
+        .collapsible:after {          
+            content: '\002B';          
+            font-size: 1em;          
+            color: #777;          
+            float: right;          
+            margin-left: 5px;          
+        }          
+  
+        .collapsible.active:after {          
+            content: "\2212";          
+        }          
+  
+        .content {          
+            padding: 0 1em;          
+            max-height: 0;          
+            overflow: hidden;          
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;          
+            background-color: #fafafa;          
+            border-left: 1px solid #ddd;          
+            border-right: 1px solid #ddd;          
+            border-bottom: 1px solid #ddd;          
+        }          
+    </style>          
+  
+    <!-- Embedded JavaScript -->          
+    <script>          
+        function showLoading() {          
+            document.getElementById('loading').style.display = 'block';          
+        }          
+  
+        function submitPreview(idx) {          
+            // Open the modal and show loading indicator          
+            openPreviewModal();          
+  
+            // Gather the form data          
+            var formData = new FormData();          
+            var testCaseCountInput = document.getElementsByName('test_case_count')[0];          
+            var testCaseCount = testCaseCountInput.value;          
+  
+            formData.append('test_case_count', testCaseCount);          
+  
+            // Append deployment_names          
+            var deploymentNameFields = document.getElementsByName('deployment_names');          
+            for (var i = 0; i < deploymentNameFields.length; i++) {          
+                if (deploymentNameFields[i].checked) {          
+                    formData.append('deployment_names', deploymentNameFields[i].value);          
+                }          
+            }          
+  
+            // Append idx_meta_id          
+            var idxMetaId = document.getElementById('idx_meta_id').value;          
+            formData.append('idx_meta_id', idxMetaId);          
+  
+            // Append response_criteria          
+            var responseCriteriaField = document.getElementsByName('response_criteria')[0];          
+            formData.append('response_criteria', responseCriteriaField.value);          
+  
+            // Append system_prompt_template          
+            var systemPromptField = document.getElementsByName('system_prompt_template')[0];          
+            formData.append('system_prompt_template', systemPromptField.value);          
+  
+            // Append user_prompt_template          
+            var userPromptField = document.getElementsByName('user_prompt_template')[0];          
+            formData.append('user_prompt_template', userPromptField.value);          
+  
+            // Append selected metrics          
+            var metricCheckboxes = document.getElementsByName('metrics');          
+            for (var i = 0; i < metricCheckboxes.length; i++) {          
+                if (metricCheckboxes[i].checked) {          
+                    formData.append('metrics', metricCheckboxes[i].value);          
+                }          
+            }          
+  
+            // Append the specific test case input and expected output          
+            var inputPromptField = document.getElementsByName('input_prompt_' + idx)[0];          
+            var expectedOutputField = document.getElementsByName('expected_output_' + idx)[0];          
+            formData.append('input_prompt_' + idx, inputPromptField.value);          
+            formData.append('expected_output_' + idx, expectedOutputField.value);          
+  
+            // Add test_case_idx          
+            formData.append('test_case_idx', idx);          
+  
+            // Append selected fields          
+            var fieldCheckboxes = document.getElementsByName('fields');          
+            for (var i = 0; i < fieldCheckboxes.length; i++) {          
+                if (fieldCheckboxes[i].checked) {          
+                    formData.append('fields', fieldCheckboxes[i].value);          
+                }          
+            }          
+  
+            // Make an AJAX request to /preview          
+            var xhr = new XMLHttpRequest();          
+            xhr.open('POST', '/preview', true);          
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');          
+  
+            xhr.onload = function() {          
+                if (xhr.status === 200) {          
+                    // Display the preview content in the modal          
+                    document.getElementById('previewContent').innerHTML = xhr.responseText;          
+                    // Initialize the collapsible elements          
+                    initializeCollapsibles();          
+                } else {          
+                    document.getElementById('previewContent').innerHTML = '<p class="error">An error occurred while fetching the preview.</p>';          
+                }          
+            };          
+  
+            xhr.onerror = function() {          
+                document.getElementById('previewContent').innerHTML = '<p class="error">An error occurred while fetching the preview.</p>';          
+            };          
+  
+            xhr.send(formData);          
+        }          
+  
+        function openPreviewModal() {          
+            document.getElementById('previewModal').style.display = 'block';          
+            // Show loading indicator          
+            document.getElementById('previewContent').innerHTML = '<div class="spinner"><div class="bounce1"></div><div class="bounce2"></div></div><p style="text-align:center;">Loading preview...</p>';          
+        }          
+  
+        function closePreviewModal() {          
+            document.getElementById('previewModal').style.display = 'none';          
+            document.getElementById('previewContent').innerHTML = '';          
+        }          
+  
+        function removeTestCase(testCaseId) {          
+            var confirmation = confirm("Are you sure you want to remove this test case?");          
+            if (confirmation) {          
+                var form = document.getElementById('remove_test_case_form');          
+                var input = document.getElementById('test_case_id_to_remove');          
+                input.value = testCaseId;          
+                form.submit();          
+            }          
+        }          
+  
+        function openAddTestCaseModal() {          
+            document.getElementById('addTestCaseModal').style.display = 'block';          
+        }          
+  
+        function closeAddTestCaseModal() {          
+            document.getElementById('addTestCaseModal').style.display = 'none';          
+            clearAddTestCaseForm();          
+        }          
+  
+        function clearAddTestCaseForm() {          
+            document.getElementById('new_input_prompt').value = '';          
+            document.getElementById('new_expected_output').value = '';          
+            document.getElementById('addTestCaseError').innerText = '';          
+        }          
+  
+        function validateAddTestCaseForm() {          
+            var inputPrompt = document.getElementById('new_input_prompt').value.trim();          
+            var errorElement = document.getElementById('addTestCaseError');          
+  
+            if (inputPrompt === '') {          
+                errorElement.innerText = 'Input Prompt is required.';          
+                return false;          
+            }          
+  
+            return true;          
+        }          
+  
+        // Function to initialize collapsible elements          
+        function initializeCollapsibles() {          
+            var coll = document.getElementById('previewContent').getElementsByClassName("collapsible");          
+            for (var i = 0; i < coll.length; i++) {          
+                coll[i].addEventListener("click", function() {          
+                    this.classList.toggle("active");          
+                    // Assuming the button is inside an h4, and the content div is the next sibling after h4          
+                    var content = this.parentElement.nextElementSibling;          
+                    if (content && content.classList.contains('content')) {          
+                        if (content.style.maxHeight){          
+                            content.style.maxHeight = null;          
+                            content.style.padding = null;          
+                        } else {          
+                            content.style.maxHeight = content.scrollHeight + "px";          
+                            content.style.padding = "1em 0";          
+                        }          
+                    }          
+                });          
+            }          
+        }          
+  
+        // Close modal when clicking outside of it          
+        window.onclick = function(event) {          
+            var modal = document.getElementById('addTestCaseModal');          
+            var previewModal = document.getElementById('previewModal');          
+            if (event.target == modal) {          
+                closeAddTestCaseModal();          
+            }          
+            if (event.target == previewModal) {          
+                closePreviewModal();          
+            }          
+        };          
+  
+        // Function to load fields based on selected index configuration          
+        function loadFields() {    
+            var idxMetaId = document.getElementById('idx_meta_id').value;    
+            var fieldsContainer = document.getElementById('fields_container');    
+            var testCasesTableBody = document.getElementById('test_cases_table').getElementsByTagName('tbody')[0];    
+  
+            fieldsContainer.innerHTML = ''; // Clear previous fields    
+            testCasesTableBody.innerHTML = ''; // Clear previous test cases    
+  
+            if (idxMetaId !== '') {    
+                var xhr = new XMLHttpRequest();    
+                xhr.open('POST', '/get_fields', true);    
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');    
+                xhr.onload = function() {    
+                    if (xhr.status === 200) {    
+                        var data = JSON.parse(xhr.responseText);    
+                        // Handle fields    
+                        if (data.fields && data.fields.length > 0) {    
+                            data.fields.sort(); // Optional: sort fields alphabetically    
+                            data.fields.forEach(function(field) {    
+                                var label = document.createElement('label');    
+                                var checkbox = document.createElement('input');    
+                                checkbox.type = 'checkbox';    
+                                checkbox.name = 'fields';    
+                                checkbox.value = field.name;    
+                                checkbox.checked = false; // Uncheck all fields by default    
+                                label.appendChild(checkbox);    
+                                label.appendChild(document.createTextNode(' ' + field.name));    
+                                fieldsContainer.appendChild(label);    
+                                fieldsContainer.appendChild(document.createElement('br'));    
+                            });    
+                        } else {    
+                            fieldsContainer.innerHTML = '<p>No fields found in the selected collection.</p>';    
+                        }    
+                        // Handle test_dataset    
+                        if (data.test_dataset && data.test_dataset.length > 0) {    
+                            var testDataset = data.test_dataset;    
+                            testDataset.forEach(function(testCase, index) {    
+                                var tr = document.createElement('tr');    
+  
+                                // ID Column    
+                                var tdId = document.createElement('td');    
+                                tdId.textContent = testCase.id;    
+                                tr.appendChild(tdId);    
+  
+                                // Input Prompt Column    
+                                var tdInput = document.createElement('td');    
+                                var inputInputPrompt = document.createElement('input');    
+                                inputInputPrompt.type = 'text';    
+                                inputInputPrompt.name = 'input_prompt_' + index;    
+                                inputInputPrompt.value = testCase.input;    
+                                tdInput.appendChild(inputInputPrompt);    
+                                tr.appendChild(tdInput);    
+  
+                                // Expected Output Column    
+                                var tdExpected = document.createElement('td');    
+                                var inputExpectedOutput = document.createElement('input');    
+                                inputExpectedOutput.type = 'text';    
+                                inputExpectedOutput.name = 'expected_output_' + index;    
+                                inputExpectedOutput.value = testCase.expected || '';    
+                                tdExpected.appendChild(inputExpectedOutput);    
+                                tr.appendChild(tdExpected);    
+  
+                                // Actions Column    
+                                var tdActions = document.createElement('td');    
+                                var previewButton = document.createElement('button');    
+                                previewButton.type = 'button';    
+                                previewButton.className = 'btn icon';    
+                                previewButton.title = 'Preview';    
+                                previewButton.innerHTML = '<i class="fa fa-eye"></i>';    
+                                previewButton.onclick = (function(idx) {    
+                                    return function() {    
+                                        submitPreview(idx);    
+                                    };    
+                                })(index);    
+                                tdActions.appendChild(previewButton);    
+  
+                                var removeButton = document.createElement('button');    
+                                removeButton.type = 'button';    
+                                removeButton.className = 'btn icon danger';    
+                                removeButton.title = 'Remove';    
+                                removeButton.innerHTML = '<i class="fa fa-trash"></i>';    
+                                removeButton.onclick = (function(testCaseId) {    
+                                    return function() {    
+                                        removeTestCase(testCaseId);    
+                                    };    
+                                })(testCase.id);    
+                                tdActions.appendChild(removeButton);    
+  
+                                tr.appendChild(tdActions);    
+  
+                                testCasesTableBody.appendChild(tr);    
+                            });    
+                            // Update the test_case_count hidden input    
+                            document.getElementsByName('test_case_count')[0].value = testDataset.length;    
+                        } else {    
+                            testCasesTableBody.innerHTML = '<tr><td colspan="4">No test cases found in the selected index configuration.</td></tr>';    
+                            document.getElementsByName('test_case_count')[0].value = 0;    
+                        }    
+                    } else {    
+                        fieldsContainer.innerHTML = '<p>Error loading fields.</p>';    
+                        testCasesTableBody.innerHTML = '<tr><td colspan="4">Error loading test cases.</td></tr>';    
+                    }    
+                };    
+                xhr.onerror = function() {    
+                    fieldsContainer.innerHTML = '<p>Error loading fields.</p>';    
+                    testCasesTableBody.innerHTML = '<tr><td colspan="4">Error loading test cases.</td></tr>';    
+                };    
+                // Send idx_meta_id to /get_fields route    
+                xhr.send('idx_meta_id=' + encodeURIComponent(idxMetaId));    
+            } else {    
+                fieldsContainer.innerHTML = '<p>Please select an index configuration to load fields.</p>';    
+                testCasesTableBody.innerHTML = '<tr><td colspan="4">Please select an index configuration to load test cases.</td></tr>';    
+                document.getElementsByName('test_case_count')[0].value = 0;    
+            }    
+        }    
+  
+        // Initialize event listener on page load    
+        document.addEventListener('DOMContentLoaded', function() {    
+            document.getElementById('idx_meta_id').addEventListener('change', loadFields);    
+            // Trigger loadFields if an idx_meta_id is pre-selected    
+            if (document.getElementById('idx_meta_id').value !== '') {    
+                loadFields();    
+            }    
+        });        
+    </script>          
+</head>          
+<body>          
+    <header>          
+        <h1>RAG Task with Metrics Selection</h1>          
+    </header>          
+  
+    <!-- Navigation Menu -->          
+    <nav>          
+        <ul>          
+            <li><a href="{{ url_for('index') }}">Home</a></li>          
+            <li><a href="{{ url_for('list_indexes') }}"> Atlas Search Indexes</a></li>          
+            <li><a href="{{ url_for('manage_evaluators') }}">Manage Evaluators</a></li>      
+        </ul>          
+    </nav>          
+  
+    <main>          
+        <!-- Modal for adding a new test case -->          
+        <div id="addTestCaseModal" class="modal">          
+            <div class="modal-content">          
+                <a href="javascript:void(0);" class="close" onclick="closeAddTestCaseModal()">&times;</a>          
+                <h2>Add New Test Case</h2>          
+                <form id="add_test_case_form" method="post" action="/add_test_case" onsubmit="return validateAddTestCaseForm();">          
+                    <div class="form-group">          
+                        <label for="new_input_prompt">Input Prompt:</label>          
+                        <input type="text" id="new_input_prompt" name="new_input_prompt" required>          
+                    </div>          
+                    <div class="form-group">          
+                        <label for="new_expected_output">Expected Output (Optional):</label>          
+                        <input type="text" id="new_expected_output" name="new_expected_output">          
+                    </div>          
+                    <div class="error" id="addTestCaseError"></div>          
+                    <div class="form-actions">          
+                        <button type="submit" class="btn primary">Add Test Case</button>          
+                        <button type="button" class="btn" onclick="closeAddTestCaseModal()">Cancel</button>          
+                    </div>          
+                </form>          
+            </div>          
+        </div>          
+  
+        <!-- Modal for previewing a test case -->          
+        <div id="previewModal" class="modal">          
+            <div class="modal-content">          
+                <a href="javascript:void(0);" class="close" onclick="closePreviewModal()">&times;</a>          
+                <h2>Preview Result</h2>          
+                <div id="previewContent">          
+                    <!-- Preview content or loading indicator will be injected here -->          
+                </div>          
+                <div class="form-actions">          
+                    <button type="button" class="btn" onclick="closePreviewModal()"><i class="fa fa-times"></i> Close</button>          
+                </div>          
+            </div>          
+        </div>          
+  
+        <!-- Form for removing a test case -->          
+        <form id="remove_test_case_form" method="post" action="/remove_test_case" style="display: none;">          
+            <input type="hidden" name="test_case_id_to_remove" id="test_case_id_to_remove">          
+        </form>          
+  
+        <section class="test-dataset">          
+            <h2>Test Dataset Evaluation</h2>          
+            <form id="test_dataset_form" method="post">          
+                <!-- Deployment Selection -->          
                 <div class="form-group">          
-                    <label>Select Evaluation Metrics:</label>          
+                    <label>Select Deployment Names:</label>          
                     <div>          
-                        {% for metric in available_metrics %}          
+                        {% for name in deployment_names %}          
                         <label>          
-                            <input type="checkbox" name="metrics" value="{{ metric.name }}" {% if metric.selected %}checked{% endif %}>          
-                            {{ metric.name }}          
+                            <input type="checkbox" name="deployment_names" value="{{ name }}" {% if name == default_deployment %}checked{% endif %}>          
+                            {{ name }}          
                         </label><br>          
                         {% endfor %}          
                     </div>          
                 </div>          
   
-                <!-- Fields Selection -->        
-                <div class="form-group">        
-                    <label>Select Fields to Include in Context:</label>        
-                    <div id="fields_container">        
-                        <!-- Fields will be populated via JavaScript -->        
-                        <p>Please select an index configuration to load fields.</p>        
-                    </div>        
-                </div>        
+                <!-- Index Configuration Selection -->          
+                <div class="form-group">          
+                    <label for="idx_meta_id">Select Index Configuration:</label>          
+                    <select id="idx_meta_id" name="idx_meta_id" required>          
+                        <option value="">-- Select Index Configuration --</option>          
+                        {% for idx_meta in idx_meta_entries %}          
+                        <option value="{{ idx_meta['_id'] }}" {% if idx_meta['_id'] == session.get('idx_meta_id') %}selected{% endif %}>          
+                            {{ idx_meta['source_db'] }}.{{ idx_meta['source_collection'] }} - {{ idx_meta['embedding_model_name'] }} - {{ idx_meta['index_name'] }}          
+                        </option>          
+                        {% endfor %}          
+                    </select>          
+                </div>          
   
-                <!-- Test Cases Table -->        
-                <div class="table-responsive">        
-                    <table id="test_cases_table">        
-                        <thead>        
-                            <tr>        
-                                <th>ID</th>        
-                                <th>Input Prompt</th>        
-                                <th>Expected Output</th>        
-                                <th>Actions</th>        
-                            </tr>        
-                        </thead>        
-                        <tbody>        
-                            {% for case in test_dataset %}        
-                            <tr>        
-                                <td>{{ case.id }}</td>        
-                                <td>        
-                                    <input type="text" name="input_prompt_{{ loop.index0 }}" value="{{ case.input }}">        
-                                </td>        
-                                <td>        
-                                    <input type="text" name="expected_output_{{ loop.index0 }}" value="{{ case.expected }}">        
-                                </td>        
-                                <td>        
-                                    <button type="button" class="btn icon" onclick="submitPreview({{ loop.index0 }})" title="Preview"><i class="fa fa-eye"></i></button>        
-                                    <button type="button" class="btn icon danger" onclick="removeTestCase({{ case.id }})" title="Remove"><i class="fa fa-trash"></i></button>        
-                                </td>        
-                            </tr>        
-                            {% endfor %}        
-                        </tbody>        
-                    </table>        
-                </div>        
+                <!-- System Prompt Template Input -->          
+                <div class="form-group">          
+                    <label for="system_prompt_template">System Prompt Template:</label>          
+                    <textarea name="system_prompt_template" rows="6">{{ default_system_prompt }}</textarea>          
+                </div>          
   
-                <input type="hidden" name="test_case_count" value="{{ test_dataset|length }}">        
-                <div class="form-actions">        
-                    <button type="button" class="btn primary" onclick="openAddTestCaseModal()"><i class="fa fa-plus"></i> Add New Test Case</button>        
-                    <button type="submit" class="btn primary" formaction="/run_test" onclick="showLoading()"><i class="fa fa-play"></i> Run Test on Test Dataset</button>        
-                    <form method="get" action="/reset" style="display: inline;">        
-                        <button type="submit" class="btn"><i class="fa fa-undo"></i> Reset Test Dataset to Default</button>        
-                    </form>        
-                </div>        
-            </form>        
-        </section>        
+                <!-- User Prompt Template Input -->          
+                <div class="form-group">          
+                    <label for="user_prompt_template">User Prompt Template:</label>          
+                    <textarea name="user_prompt_template" rows="6">{{ default_user_prompt }}</textarea>          
+                </div>          
   
-        <!-- Previous Test Runs Section -->        
-        <section class="previous-runs">        
-            <h2>Previous Test Runs</h2>        
-            <div class="table-responsive">        
-                <table>        
-                    <thead>        
-                        <tr>        
-                            <th>Timestamp</th>        
-                            <th>Deployment Names (Duration, Tests)</th>        
-                            <th>Average Scores</th>        
-                            <th>Actions</th>        
-                        </tr>        
-                    </thead>        
-                    <tbody>        
-                        {% for run in previous_runs %}        
-                        <tr>        
-                            <td>{{ run.timestamp }}</td>        
-                            <td>        
-                                {% if run.deployment_names %}        
-                                    {% for name in run.deployment_names %}        
-                                        {{ name }}        
-                                        {% set details = [] %}        
-                                        {% if run.models and run.models[name] %}        
-                                            {% if run.models[name]['duration_seconds'] %}        
-                                                {% set _ = details.append('%.2f'|format(run.models[name]['duration_seconds']) ~ ' s') %}        
-                                            {% endif %}        
-                                            {% if run.models[name]['test_cases'] %}        
-                                                {% set num_tests = run.models[name]['test_cases'] | length %}        
-                                                {% set _ = details.append(num_tests|string ~ ' tests') %}        
-                                            {% endif %}        
-                                        {% endif %}        
-                                        {% if details %}        
-                                            ({{ details | join(', ') }})        
-                                        {% endif %}        
-                                        {% if not loop.last %}        
-                                            ,        
-                                        {% endif %}        
-                                    {% endfor %}        
-                                {% else %}        
-                                    {{ run.deployment_name }}        
-                                    {% set details = [] %}        
-                                    {% if run.total_duration_seconds %}        
-                                        {% set _ = details.append('%.2f'|format(run.total_duration_seconds) ~ ' s') %}        
-                                    {% endif %}        
-                                    {% if run.test_cases %}        
-                                        {% set num_tests = run.test_cases | length %}        
-                                        {% set _ = details.append(num_tests|string ~ ' tests') %}        
-                                    {% endif %}        
-                                    {% if details %}        
-                                        ({{ details | join(', ') }})        
-                                    {% endif %}        
-                                {% endif %}        
-                            </td>        
-                            <td>        
-                                {% if run.models %}        
-                                    <!-- For each model, display its name and average scores -->        
-                                    {% for model_name, model_data in run.models.items() %}        
-                                        <strong>{{ model_name }}</strong>:        
-                                        {% for metric_name, avg_score in model_data.average_scores.items() %}        
-                                            {{ metric_name }}: {{ "%.2f"|format(avg_score) }}        
-                                            {% if not loop.last %}        
-                                                |        
-                                            {% endif %}        
-                                        {% endfor %}        
-                                        {% if not loop.last %}        
-                                            <br>        
-                                        {% endif %}        
-                                    {% endfor %}        
-                                {% elif run.average_scores %}        
-                                    {% for metric_name, avg_score in run.average_scores.items() %}        
-                                        {{ metric_name }}: {{ "%.2f"|format(avg_score) }}        
-                                        {% if not loop.last %}        
-                                            |        
-                                        {% endif %}        
-                                    {% endfor %}        
-                                {% else %}        
-                                    N/A        
-                                {% endif %}        
-                            </td>        
-                            <td>        
-                                <a href="/test_run/{{ run._id }}" class="btn icon" title="View Results"><i class="fa fa-file-alt"></i></a>        
-                            </td>        
-                        </tr>        
-                        {% endfor %}        
-                    </tbody>        
-                </table>        
-            </div>        
-        </section>        
+                <!-- Response Criteria Input -->          
+                <div class="form-group">          
+                    <label for="response_criteria">Response Criteria:</label>          
+                    <textarea name="response_criteria" rows="4">{{ default_response_criteria }}</textarea>          
+                </div>          
   
-        <!-- Loading Indicator for Running Test -->        
-        <div id="loading">        
-            <div class="spinner"><div class="bounce1"></div><div class="bounce2"></div></div>        
-            <p>Processing...</p>        
-        </div>        
-    </main>        
+                <!-- Metric Selection -->            
+                <div class="form-group">            
+                    <label>Select Evaluation Metrics:</label>            
+                    <div>            
+                        {% for metric in available_metrics %}            
+                        <label>            
+                            <input type="checkbox" name="metrics" value="{{ metric.name }}" {% if metric.selected %}checked{% endif %}>            
+                            {{ metric.name }}            
+                        </label><br>            
+                        {% endfor %}            
+                    </div>            
+                </div>            
   
-    <footer>        
-        <p>&copy; {{ current_year }} Your Company Name</p>        
-    </footer>        
-</body>        
+                <!-- Fields Selection -->          
+                <div class="form-group">          
+                    <label>Select Fields to Include in Context:</label>          
+                    <div id="fields_container">          
+                        <!-- Fields will be populated via JavaScript -->          
+                        <p>Please select an index configuration to load fields.</p>          
+                    </div>          
+                </div>          
+  
+                <!-- Test Cases Table -->          
+                <div class="table-responsive">          
+                    <table id="test_cases_table">          
+                        <thead>          
+                            <tr>          
+                                <th>ID</th>          
+                                <th>Input Prompt</th>          
+                                <th>Expected Output</th>          
+                                <th>Actions</th>          
+                            </tr>          
+                        </thead>          
+                        <tbody>          
+                            {% if test_dataset %}          
+                                {% for case in test_dataset %}          
+                                <tr>          
+                                    <td>{{ case.id }}</td>          
+                                    <td>          
+                                        <input type="text" name="input_prompt_{{ loop.index0 }}" value="{{ case.input }}">          
+                                    </td>          
+                                    <td>          
+                                        <input type="text" name="expected_output_{{ loop.index0 }}" value="{{ case.expected }}">          
+                                    </td>          
+                                    <td>          
+                                        <button type="button" class="btn icon" onclick="submitPreview({{ loop.index0 }})" title="Preview"><i class="fa fa-eye"></i></button>          
+                                        <button type="button" class="btn icon danger" onclick="removeTestCase({{ case.id }})" title="Remove"><i class="fa fa-trash"></i></button>          
+                                    </td>          
+                                </tr>          
+                                {% endfor %}          
+                            {% else %}          
+                                <tr><td colspan="4">Please select an index configuration to load test cases.</td></tr>          
+                            {% endif %}          
+                        </tbody>          
+                    </table>          
+                </div>          
+  
+                <input type="hidden" name="test_case_count" value="{{ test_dataset|length }}">          
+                <div class="form-actions">          
+                    <button type="button" class="btn primary" onclick="openAddTestCaseModal()"><i class="fa fa-plus"></i> Add New Test Case</button>          
+                    <button type="submit" class="btn primary" formaction="/run_test" onclick="showLoading()"><i class="fa fa-play"></i> Run Test on Test Dataset</button>          
+                    <form method="get" action="/reset" style="display: inline;">          
+                        <button type="submit" class="btn"><i class="fa fa-undo"></i> Reset Test Dataset to Default</button>          
+                    </form>          
+                </div>          
+            </form>          
+        </section>          
+  
+        <!-- Previous Test Runs Section -->          
+        <section class="previous-runs">          
+            <h2>Previous Test Runs</h2>          
+            <div class="table-responsive">          
+                <table>          
+                    <thead>          
+                        <tr>          
+                            <th>Timestamp</th>          
+                            <th>Deployment Names (Duration, Tests)</th>          
+                            <th>Average Scores</th>          
+                            <th>Actions</th>          
+                        </tr>          
+                    </thead>          
+                    <tbody>          
+                        {% for run in previous_runs %}          
+                        <tr>          
+                            <td>{{ run.timestamp }}</td>          
+                            <td>          
+                                {% if run.deployment_names %}          
+                                    {% for name in run.deployment_names %}          
+                                        {{ name }}          
+                                        {% set details = [] %}          
+                                        {% if run.models and run.models[name] %}          
+                                            {% if run.models[name]['duration_seconds'] %}          
+                                                {% set _ = details.append('%.2f'|format(run.models[name]['duration_seconds']) ~ ' s') %}          
+                                            {% endif %}          
+                                            {% if run.models[name]['test_cases'] %}          
+                                                {% set num_tests = run.models[name]['test_cases'] | length %}          
+                                                {% set _ = details.append(num_tests|string ~ ' tests') %}          
+                                            {% endif %}          
+                                        {% endif %}          
+                                        {% if details %}          
+                                            ({{ details | join(', ') }})          
+                                        {% endif %}          
+                                        {% if not loop.last %}          
+                                            ,          
+                                        {% endif %}          
+                                    {% endfor %}          
+                                {% else %}          
+                                    {{ run.deployment_name }}          
+                                    {% set details = [] %}          
+                                    {% if run.total_duration_seconds %}          
+                                        {% set _ = details.append('%.2f'|format(run.total_duration_seconds) ~ ' s') %}          
+                                    {% endif %}          
+                                    {% if run.test_cases %}          
+                                        {% set num_tests = run.test_cases | length %}          
+                                        {% set _ = details.append(num_tests|string ~ ' tests') %}          
+                                    {% endif %}          
+                                    {% if details %}          
+                                        ({{ details | join(', ') }})          
+                                    {% endif %}          
+                                {% endif %}          
+                            </td>          
+                            <td>          
+                                {% if run.models %}          
+                                    <!-- For each model, display its name and average scores -->          
+                                    {% for model_name, model_data in run.models.items() %}          
+                                        <strong>{{ model_name }}</strong>:          
+                                        {% for metric_name, avg_score in model_data.average_scores.items() %}          
+                                            {{ metric_name }}: {{ "%.2f"|format(avg_score) }}          
+                                            {% if not loop.last %}          
+                                                |          
+                                            {% endif %}          
+                                        {% endfor %}          
+                                        {% if not loop.last %}          
+                                            <br>          
+                                        {% endif %}          
+                                    {% endfor %}          
+                                {% elif run.average_scores %}          
+                                    {% for metric_name, avg_score in run.average_scores.items() %}          
+                                        {{ metric_name }}: {{ "%.2f"|format(avg_score) }}          
+                                        {% if not loop.last %}          
+                                            |          
+                                        {% endif %}          
+                                    {% endfor %}          
+                                {% else %}          
+                                    N/A          
+                                {% endif %}          
+                            </td>          
+                            <td>          
+                                <a href="/test_run/{{ run._id }}" class="btn icon" title="View Results"><i class="fa fa-file-alt"></i></a>          
+                            </td>          
+                        </tr>          
+                        {% endfor %}          
+                    </tbody>          
+                </table>          
+            </div>          
+        </section>          
+  
+        <!-- Loading Indicator for Running Test -->          
+        <div id="loading">          
+            <div class="spinner"><div class="bounce1"></div><div class="bounce2"></div></div>          
+            <p>Processing...</p>          
+        </div>          
+    </main>          
+  
+    <footer>          
+        <p>&copy; {{ current_year }} Your Company Name</p>          
+    </footer>          
+</body>          
 </html>  
