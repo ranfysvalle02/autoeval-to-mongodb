@@ -959,7 +959,6 @@ def index():
   
     default_response_criteria = """  
 - Provide a concise answer to the question based ONLY on the context.  
-- Respond ONLY with the complete title of the movie that best matches the question.  
     """.strip()  
     default_system_prompt = """  
 Below is the context, which includes plots of movies.  
