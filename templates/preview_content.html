@@ -32,13 +32,25 @@
         <th>Generated Output</th>  
         <td>{{ test_case.generated_output }}</td>  
     </tr>  
-    {% for metric_name, result in test_case.metric_results.items() %}  
-    <tr>  
-        <th>{{ metric_name }} Score</th>  
-        <td>{{ "%.2f"|format(result.score) }}</td>  
-    </tr>  
-    {% endfor %}  
 </table>  
+  
+<!-- Evaluation Metrics -->  
+<h4>Evaluation Metrics</h4>  
+{% for metric_name, result in test_case.metric_results.items() %}  
+<div>  
+    <strong>{{ metric_name }} Score: {{ "%.2f"|format(result.score) }}</strong>  
+    <h4><button type="button" class="collapsible">Details</button></h4>  
+    <div class="content">  
+        {% if result.reason %}  
+        <p><strong>Reason:</strong> {{ result.reason }}</p>  
+        {% endif %}  
+        {% if result.metadata %}  
+        <p><strong>Metadata:</strong></p>  
+        <pre>{{ result.metadata | tojson(indent=2) }}</pre>  
+        {% endif %}  
+    </div>  
+</div>  
+{% endfor %}  
   
 <!-- Context Documents Retrieved from MongoDB -->  
 <h4><button type="button" class="collapsible">Context Documents Retrieved from MongoDB</button></h4>  
@@ -48,11 +60,11 @@
         <table>  
             <thead>  
                 <tr>  
-                    {% if test_case.context_docs[0]['score'] is defined %}  
-                    <th>Score</th>  
+                    {% if test_case.context_docs[0]['vs_score'] is defined %}  
+                    <th>Vector Search Score</th>  
                     {% endif %}  
                     {% for key in test_case.context_docs[0].keys() %}  
-                    {% if key != 'score' %}  
+                    {% if key != 'vs_score' %}  
                     <th>{{ key|capitalize }}</th>  
                     {% endif %}  
                     {% endfor %}  
@@ -61,11 +73,11 @@
             <tbody>  
                 {% for doc in test_case.context_docs %}  
                 <tr>  
-                    {% if doc['score'] is defined %}  
-                    <td>{{ "%.4f"|format(doc['score']) }}</td>  
+                    {% if doc['vs_score'] is defined %}  
+                    <td>{{ "%.4f"|format(doc['vs_score']) }}</td>  
                     {% endif %}  
                     {% for key, value in doc.items() %}  
-                    {% if key != 'score' %}  
+                    {% if key != 'vs_score' %}  
                     <td>{{ value }}</td>  
                     {% endif %}  
                     {% endfor %}  

@@ -538,48 +538,48 @@
   
         // Function to load fields based on selected index configuration        
         function loadFields() {  
-    var idxMetaId = document.getElementById('idx_meta_id').value;  
-    var fieldsContainer = document.getElementById('fields_container');  
-  
-    fieldsContainer.innerHTML = ''; // Clear previous fields  
-  
-    if (idxMetaId !== '') {  
-        var xhr = new XMLHttpRequest();  
-        xhr.open('POST', '/get_fields', true);  
-        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');  
-        xhr.onload = function() {  
-            if (xhr.status === 200) {  
-                var data = JSON.parse(xhr.responseText);  
-                if (data.fields && data.fields.length > 0) {  
-                    data.fields.sort(); // Optional: sort fields alphabetically  
-                    data.fields.forEach(function(field) {  
-                        var label = document.createElement('label');  
-                        var checkbox = document.createElement('input');  
-                        checkbox.type = 'checkbox';  
-                        checkbox.name = 'fields';  
-                        checkbox.value = field.name;  
-                        checkbox.checked = field.name == '_id' ? false : true; // Exclude _id by default  
-                        label.appendChild(checkbox);  
-                        label.appendChild(document.createTextNode(' ' + field.name));  
-                        fieldsContainer.appendChild(label);  
-                        fieldsContainer.appendChild(document.createElement('br'));  
-                    });  
-                } else {  
-                    fieldsContainer.innerHTML = '<p>No fields found in the selected collection.</p>';  
-                }  
+            var idxMetaId = document.getElementById('idx_meta_id').value;  
+            var fieldsContainer = document.getElementById('fields_container');  
+        
+            fieldsContainer.innerHTML = ''; // Clear previous fields  
+        
+            if (idxMetaId !== '') {  
+                var xhr = new XMLHttpRequest();  
+                xhr.open('POST', '/get_fields', true);  
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');  
+                xhr.onload = function() {  
+                    if (xhr.status === 200) {  
+                        var data = JSON.parse(xhr.responseText);  
+                        if (data.fields && data.fields.length > 0) {  
+                            data.fields.sort(); // Optional: sort fields alphabetically  
+                            data.fields.forEach(function(field) {  
+                                var label = document.createElement('label');  
+                                var checkbox = document.createElement('input');  
+                                checkbox.type = 'checkbox';  
+                                checkbox.name = 'fields';  
+                                checkbox.value = field.name;  
+                                checkbox.checked = false; // Uncheck all fields by default  
+                                label.appendChild(checkbox);  
+                                label.appendChild(document.createTextNode(' ' + field.name));  
+                                fieldsContainer.appendChild(label);  
+                                fieldsContainer.appendChild(document.createElement('br'));  
+                            });  
+                        } else {  
+                            fieldsContainer.innerHTML = '<p>No fields found in the selected collection.</p>';  
+                        }  
+                    } else {  
+                        fieldsContainer.innerHTML = '<p>Error loading fields.</p>';  
+                    }  
+                };  
+                xhr.onerror = function() {  
+                    fieldsContainer.innerHTML = '<p>Error loading fields.</p>';  
+                };  
+                // Send idx_meta_id to /get_fields route  
+                xhr.send('idx_meta_id=' + encodeURIComponent(idxMetaId));  
             } else {  
-                fieldsContainer.innerHTML = '<p>Error loading fields.</p>';  
+                fieldsContainer.innerHTML = '<p>Please select an index configuration to load fields.</p>';  
             }  
-        };  
-        xhr.onerror = function() {  
-            fieldsContainer.innerHTML = '<p>Error loading fields.</p>';  
-        };  
-        // Send idx_meta_id to /get_fields route  
-        xhr.send('idx_meta_id=' + encodeURIComponent(idxMetaId));  
-    } else {  
-        fieldsContainer.innerHTML = '<p>Please select an index configuration to load fields.</p>';  
-    }  
-}  
+        }  
   
 // Initialize event listener on page load  
 document.addEventListener('DOMContentLoaded', function() {  
