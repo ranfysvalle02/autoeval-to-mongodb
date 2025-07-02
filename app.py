@@ -1295,14 +1295,46 @@ def list_indexes():
                                 autoeval.logger.info(f"Index '{index_name}' created successfully for model '{model_name}'.")  
   
                                 # Collect context from a sample of documents to use for test dataset generation  
-                                sample_docs_cursor = autoeval.mongo_client[destination_db_name][destination_collection_name].find({}, {source_field: 1}).limit(5)  
-                                context_list = []  
-                                for doc in sample_docs_cursor:  
-                                    text = autoeval.get_value_from_field(doc, source_field)  
-                                    if text:  
-                                        context_list.append(text)  
-  
-                                context_str = "\n".join(context_list)  
+                                # --- Aggregation Magic ---
+
+                                # First, get a sample document to identify all potential fields.
+                                # In a production environment, you might have a more robust schema discovery mechanism
+                                # or rely on predefined schema knowledge.
+                                
+                                sample_doc = autoeval.mongo_client[destination_db_name][destination_collection_name].find_one({})
+                                all_fields = list(sample_doc.keys()) if sample_doc else []
+
+                                # Build the dynamic $project stage
+                                project_stage_fields = {"_id": 0} # Exclude _id by default
+
+                                for field in all_fields:
+                                    # If the field is the source_field, we still want to project it as is,
+                                    # assuming it's not an array that needs to be removed from the final extraction.
+                                    # If source_field could be an array that you want to exclude from the context_list,
+                                    # the condition below would handle it.
+                                    project_stage_fields[field] = {
+                                        "$cond": {
+                                            "if": {"$eq": [{"$type": f"${field}"}, "array"]},
+                                            "then": "$$REMOVE",  # Exclude if it's an array
+                                            "else": f"${field}" # Include otherwise
+                                        }
+                                    }
+
+                                pipeline = [
+                                    {"$project": project_stage_fields},
+                                    {"$limit": 5} # Apply limit after projection
+                                ]
+
+                                sample_docs_cursor = autoeval.mongo_client[destination_db_name][destination_collection_name].aggregate(pipeline)
+
+                                context_list = []
+                                for doc in sample_docs_cursor:
+                                    # Use autoeval.get_value_from_field on the *processed* document
+                                    text = autoeval.get_value_from_field(doc, source_field)
+                                    if text:
+                                        context_list.append(text)
+
+                                context_str = "\n".join(context_list)
   
                                 # Generate Q&A pairs from the context  
                                 test_dataset_qa_pairs = autoeval.generate_qa_from_context(context_str, max_questions=5)  
