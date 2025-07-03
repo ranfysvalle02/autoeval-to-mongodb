@@ -16,6 +16,8 @@ import time
 import bson  
 import decimal  
 import logging  
+from autoevals import Factuality, LLMClassifier, init  
+from autoevals.ragas import ContextRelevancy, Faithfulness  
 
 import mdb_autoevals  # Import the MDBAutoEval class from mdb_autoevals.py
 
@@ -768,17 +770,23 @@ def preview():
                         result = evaluator.eval(  
                             input=input_prompt,  
                             output=generated_output,  
-                            expected=expected_output  
+                            expected=expected_output  ,
+                            context=context_str,
+                            response_criteria=response_criteria
                         )  
                 elif isinstance(evaluator, LLMClassifier):  
                     result = evaluator.eval(  
-                        output=generated_output  
+                        output=generated_output,  
+                        input=input_prompt,
+                        context=context_str,
+                        response_criteria=response_criteria
                     )  
                 elif isinstance(evaluator, (ContextRelevancy, Faithfulness)):  
                     result = evaluator.eval(  
                         input=input_prompt,  
                         output=generated_output,  
-                        context=context_str  
+                        context=context_str,
+                        response_criteria=response_criteria
                     )  
                 else:  
                     autoeval.logger.error(f"Evaluator of type {type(evaluator)} for metric {metric_name} is not recognized.")  

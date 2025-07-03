@@ -60,26 +60,30 @@
         <table>  
             <thead>  
                 <tr>  
+                    {% set ns = namespace(data_keys=[]) %}  
+                    <!-- Check if 'vs_score' is present -->  
                     {% if test_case.context_docs[0]['vs_score'] is defined %}  
                     <th>Vector Search Score</th>  
                     {% endif %}  
+                    <!-- Collect the keys and build the header -->  
                     {% for key in test_case.context_docs[0].keys() %}  
-                    {% if key != 'vs_score' %}  
-                    <th>{{ key|capitalize }}</th>  
-                    {% endif %}  
+                        {% if key != 'vs_score' %}  
+                            {% set ns.data_keys = ns.data_keys + [key] %}  
+                            <th>{{ key|capitalize }}</th>  
+                        {% endif %}  
                     {% endfor %}  
                 </tr>  
             </thead>  
             <tbody>  
                 {% for doc in test_case.context_docs %}  
                 <tr>  
+                    <!-- Display 'vs_score' if present -->  
                     {% if doc['vs_score'] is defined %}  
                     <td>{{ "%.4f"|format(doc['vs_score']) }}</td>  
                     {% endif %}  
-                    {% for key, value in doc.items() %}  
-                    {% if key != 'vs_score' %}  
-                    <td>{{ value }}</td>  
-                    {% endif %}  
+                    <!-- Display the values based on ns.data_keys -->  
+                    {% for key in ns.data_keys %}  
+                        <td>{{ doc.get(key, '') }}</td>  
                     {% endfor %}  
                 </tr>  
                 {% endfor %}  

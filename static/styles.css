@@ -118,15 +118,15 @@ header h1 {
   font-weight: normal;  
   font-size: 1.8em;  
   line-height: 1;  
-  letter-spacing: 0.1em;
+  letter-spacing: 0.1em;  
   color: #fff; /* Ensure the heading text is white */  
-  font-family: "Bitcount Grid Double", system-ui;
-  font-optical-sizing: auto;
-  font-variation-settings:
-    "slnt" 0,
-    "CRSV" 0.5,
-    "ELSH" 0,
-    "ELXP" 0;
+  font-family: "Bitcount Grid Double", system-ui;  
+  font-optical-sizing: auto;  
+  font-variation-settings:  
+    "slnt" 0,  
+    "CRSV" 0.5,  
+    "ELSH" 0,  
+    "ELXP" 0;  
 }  
   
 /* Navigation Menu */  
@@ -302,10 +302,10 @@ section h2 {
   transform: none;  
   box-shadow: none;  
 }  
-
-.btn i{
-  margin-right:1em;
-}
+  
+.btn i {  
+  margin-right: 1em;  
+}  
   
 /* Microtransitions for Buttons */  
 .btn,  
@@ -476,6 +476,7 @@ table input[type="text"]:focus {
   position: relative;  
   box-shadow: var(--box-shadow);  
   animation: slideDown 0.4s ease;  
+  overflow-x: auto; /* Enable horizontal scrolling */  
 }  
   
 .close {  
@@ -512,18 +513,34 @@ table input[type="text"]:focus {
   overflow-y: auto;  
 }  
   
-/* Custom scrollbar for modal content */  
-.modal-body::-webkit-scrollbar {  
-  width: 8px;  
+/* Ensure tables inside modal are responsive */  
+.modal-content .table-responsive {  
+  overflow-x: auto; /* Enable horizontal scrolling for tables */  
 }  
   
-.modal-body::-webkit-scrollbar-thumb {  
+/* Adjust preformatted text to wrap when necessary */  
+.modal-content pre {  
+  white-space: pre-wrap;  
+  word-wrap: break-word;  
+}  
+  
+/* Custom scrollbar for modal content */  
+.modal-content::-webkit-scrollbar {  
+  width: 8px;  
+  height: 8px; /* Add height for horizontal scrollbar */  
+}  
+  
+.modal-content::-webkit-scrollbar-thumb {  
   background: var(--primary-color);  
   border-radius: 4px;  
 }  
   
-.modal-body::-webkit-scrollbar-thumb:hover {  
+.modal-content::-webkit-scrollbar-thumb:hover {  
   background: var(--primary-color-darken);  
+}  
+  
+.modal-content::-webkit-scrollbar-track {  
+  background: #e0e0e0;  
 }  
   
 .modal-footer {  
@@ -814,6 +831,7 @@ table input[type="text"]:focus {
   .modal-content {  
     width: 95%;  
     margin: 10% auto;  
+    max-width: none; /* Allow modal to expand */  
   }  
   
   section {  
