@@ -4,368 +4,15 @@
     <meta charset="UTF-8">          
     <title>RAG Task with Metrics Selection</title>          
     <!-- Include Google Fonts -->          
-    <link rel="preconnect" href="https://fonts.googleapis.com">          
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">          
-  
+    <link href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Double:wght@100..900&display=swap" rel="stylesheet">
+
     <!-- Include Font Awesome for Icons -->          
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>          
-  
-    <!-- Embedded CSS Styles -->          
-    <style>          
-        /* Global Styles */          
-        body {          
-            margin: 0;          
-            font-family: 'Roboto', sans-serif;          
-            background-color: #f5f7fa;          
-            color: #333;          
-        }          
-  
-        header, footer {          
-            background-color: #2c3e50;          
-            color: white;          
-            padding: 1em 0;          
-            text-align: center;          
-            position: sticky;          
-            top: 0;          
-            z-index: 1000;          
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);          
-        }          
-  
-        header h1 {          
-            margin: 0;          
-            font-weight: normal;          
-        }          
-  
-        main {          
-            padding: 2em;          
-            max-width: 1200px;          
-            margin: 0 auto;          
-        }          
-  
-        h2 {          
-            color: #2c3e50;          
-        }          
-  
-        a {          
-            color: #3498db;          
-            text-decoration: none;          
-        }          
-  
-        a:hover {          
-            text-decoration: underline;          
-        }          
-  
-        /* Navigation Styles */          
-        nav {          
-            background-color: #34495e;          
-            padding: 0.5em 0;          
-        }          
-  
-        nav ul {          
-            list-style-type: none;          
-            margin: 0;          
-            padding: 0;          
-            text-align: center;          
-        }          
-  
-        nav ul li {          
-            display: inline-block;          
-            margin: 0 1em;          
-        }          
-  
-        nav ul li a {          
-            color: white;          
-            font-weight: bold;          
-        }          
-  
-        nav ul li a:hover {          
-            text-decoration: underline;          
-        }          
-  
-        /* Button Styles */          
-        .btn {          
-            display: inline-block;          
-            padding: 0.5em 1em;          
-            margin: 0.2em 0;          
-            background-color: #3498db;          
-            color: white;          
-            border: none;          
-            border-radius: 4px;          
-            cursor: pointer;          
-            transition: background-color 0.3s ease, transform 0.1s ease;          
-            text-decoration: none;          
-            text-align: center;          
-        }          
-  
-        .btn:hover {          
-            background-color: #2980b9;          
-            transform: translateY(-2px);          
-        }          
-  
-        .btn:active {          
-            transform: translateY(0);          
-        }          
-  
-        .btn.danger {          
-            background-color: #e74c3c;          
-        }          
-  
-        .btn.danger:hover {          
-            background-color: #c0392b;          
-        }          
-  
-        .btn.primary {          
-            background-color: #1abc9c;          
-        }          
-  
-        .btn.primary:hover {          
-            background-color: #16a085;          
-        }          
-  
-        .btn.icon {          
-            padding: 0.5em;          
-            width: 2.5em;          
-            height: 2.5em;          
-            text-align: center;          
-        }          
-  
-        .btn.icon i {          
-            margin: 0;          
-        }          
-  
-        .form-group {          
-            margin-bottom: 1.5em;          
-        }          
-  
-        .form-group label {          
-            display: block;          
-            font-weight: bold;          
-            margin-bottom: 0.5em;          
-        }          
-  
-        .form-group input[type="text"],          
-        .form-group textarea,          
-        .form-group select {          
-            width: 100%;          
-            padding: 0.75em;          
-            border: 1px solid #ccd1d9;          
-            border-radius: 4px;          
-            transition: border-color 0.3s ease, box-shadow 0.3s ease;          
-            font-size: 1em;          
-        }          
-  
-        .form-group input[type="text"]:focus,          
-        .form-group textarea:focus,          
-        .form-group select:focus {          
-            border-color: #3498db;          
-            box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1);          
-            outline: none;          
-        }          
-  
-        .form-actions {          
-            margin-top: 1em;          
-        }          
-  
-        .form-actions button {          
-            margin-right: 0.5em;          
-        }          
-  
-        .table-responsive {          
-            overflow-x: auto;          
-            margin-bottom: 1.5em;          
-        }          
-  
-        table {          
-            width: 100%;          
-            border-collapse: collapse;          
-            background-color: white;          
-            margin-bottom: 1em;          
-        }          
-  
-        table thead {          
-            background-color: #34495e;          
-            color: white;          
-            text-align: left;          
-        }          
-  
-        table th, table td {          
-            padding: 1em;          
-            border-bottom: 1px solid #ddd;          
-            vertical-align: middle;          
-        }          
-  
-        table tbody tr {          
-            transition: background-color 0.3s ease;          
-        }          
-  
-        table tbody tr:hover {          
-            background-color: #f9f9f9;          
-        }          
-  
-        table input[type="text"] {          
-            width: 100%;          
-            padding: 0.5em;          
-            border: 1px solid #ccd1d9;          
-            border-radius: 4px;          
-            font-size: 0.95em;          
-        }          
-  
-        /* Modal Styles */          
-        .modal {          
-            display: none; /* Hidden by default */          
-            position: fixed; /* Stay in place */          
-            z-index: 10000; /* Sit on top */          
-            left: 0;          
-            top: 0;          
-            width: 100%; /* Full width */          
-            height: 100%; /* Full height */          
-            overflow: auto; /* Enable scroll if needed */          
-            background-color: rgba(0,0,0,0.5); /* Black w/ opacity */          
-        }          
-  
-        .modal-content {          
-            background-color: #fefefe;          
-            margin: 5% auto; /* Centered vertically and horizontally */          
-            padding: 2em;          
-            border: 1px solid #888;          
-            width: 80%;          
-            max-width: 800px;          
-            border-radius: 5px;          
-            position: relative;          
-            overflow-y: auto;          
-            max-height: 80vh;          
-        }          
-  
-        .modal-content .close {          
-            color: #aaa;          
-            position: absolute;          
-            right: 1em;          
-            top: 1em;          
-            font-size: 28px;          
-            font-weight: bold;          
-            text-decoration: none;          
-        }          
-  
-        .modal-content .close:hover,          
-        .modal-content .close:focus {          
-            color: black;          
-            text-decoration: none;          
-            cursor: pointer;          
-        }          
-  
-        /* Loading Spinner Styles */          
-        .spinner {          
-            margin: 50px auto;          
-            width: 50px;          
-            height: 50px;          
-            position: relative;          
-            text-align: center;          
-            animation: rotate 2.0s infinite linear;          
-        }          
-  
-        .spinner > div {          
-            width: 18px;          
-            height: 18px;          
-            background-color: #3498db;          
-  
-            border-radius: 100%;          
-            display: inline-block;          
-            position: absolute;          
-            animation: bounce 2.0s infinite ease-in-out;          
-        }          
-  
-        .spinner .bounce1 {          
-            top: 0;          
-            animation-delay: -0.32s;          
-        }          
-  
-        .spinner .bounce2 {          
-            top: auto;          
-            bottom: 0;          
-            animation-delay: -0.16s;          
-        }          
-  
-        @keyframes rotate { 100% { transform: rotate(360deg); } }          
-        @keyframes bounce {          
-            0%, 80%, 100% { transform: scale(0); }          
-            40% { transform: scale(1.0); }          
-        }          
-  
-        .error {          
-            color: #e74c3c;          
-            font-size: 0.9em;          
-        }          
-  
-        /* Responsive Design */          
-        @media (max-width: 768px) {          
-            main {          
-                padding: 1em;          
-            }          
-            .modal-content {          
-                width: 90%;          
-            }          
-            .form-group input[type="text"],          
-            .form-group textarea,          
-            .form-group select {          
-                font-size: 0.9em;          
-            }          
-            table th, table td {          
-                padding: 0.5em;          
-            }          
-            .modal-content {          
-                width: 95%;          
-            }          
-        }          
-  
-        /* Hide the loading indicator by default */          
-        #loading {          
-            display: none;          
-            text-align: center;          
-        }          
-  
-        /* Collapsible Button Styles */          
-        .collapsible {          
-            background-color: #f1f1f1;          
-            color: #2c3e50;          
-            cursor: pointer;          
-            padding: 0.5em 1em;          
-            width: 100%;          
-            border: none;          
-            text-align: left;          
-            outline: none;          
-            font-size: 1em;          
-            transition: background-color 0.3s ease;          
-            border-radius: 5px;          
-        }          
-  
-        .collapsible:hover {          
-            background-color: #e2e2e2;          
-        }          
-  
-        .collapsible:after {          
-            content: '\002B';          
-            font-size: 1em;          
-            color: #777;          
-            float: right;          
-            margin-left: 5px;          
-        }          
-  
-        .collapsible.active:after {          
-            content: "\2212";          
-        }          
-  
-        .content {          
-            padding: 0 1em;          
-            max-height: 0;          
-            overflow: hidden;          
-            transition: max-height 0.3s ease-out, padding 0.3s ease-out;          
-            background-color: #fafafa;          
-            border-left: 1px solid #ddd;          
-            border-right: 1px solid #ddd;          
-            border-bottom: 1px solid #ddd;          
-        }          
-    </style>          
-  
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>
+       
     <!-- Embedded JavaScript -->          
     <script>          
         function showLoading() {          
@@ -664,9 +311,13 @@
     </script>          
 </head>          
 <body>          
-    <header>          
-        <h1>RAG Task with Metrics Selection</h1>          
-    </header>          
+    <header>  
+        <div class="logo-container">  
+            <img src="https://mongodb.gallerycdn.vsassets.io/extensions/mongodb/mongodb-vscode/1.13.3/1749482419080/Microsoft.VisualStudio.Services.Icons.Default" alt="MongoDB Logo">  
+            <img src="https://res.cloudinary.com/ilaeweb/image/upload/c_fill,w_600,g_auto,q_auto,dpr_3.0,f_auto/ilae-climate-change-commission-brainleafsolus-colour2_D6D4D903-A7B7-9F1F-3758BEC807504AD1.png" alt="Additional Logo">  
+            <h1>MDBEvalHub</h1>  
+        </div>  
+    </header>         
   
     <!-- Navigation Menu -->          
     <nav>          
@@ -726,7 +377,7 @@
                 <!-- Deployment Selection -->          
                 <div class="form-group">          
                     <label>Select Deployment Names:</label>          
-                    <div>          
+                    <div class="checkbox-group">          
                         {% for name in deployment_names %}          
                         <label>          
                             <input type="checkbox" name="deployment_names" value="{{ name }}" {% if name == default_deployment %}checked{% endif %}>          
@@ -770,7 +421,7 @@
                 <!-- Metric Selection -->            
                 <div class="form-group">            
                     <label>Select Evaluation Metrics:</label>            
-                    <div>            
+                    <div class="checkbox-group">            
                         {% for metric in available_metrics %}            
                         <label>            
                             <input type="checkbox" name="metrics" value="{{ metric.name }}" {% if metric.selected %}checked{% endif %}>            
@@ -783,7 +434,7 @@
                 <!-- Fields Selection -->          
                 <div class="form-group">          
                     <label>Select Fields to Include in Context:</label>          
-                    <div id="fields_container">          
+                    <div id="fields_container" class="checkbox-group">          
                         <!-- Fields will be populated via JavaScript -->          
                         <p>Please select an index configuration to load fields.</p>          
                     </div>          
@@ -932,7 +583,7 @@
     </main>          
   
     <footer>          
-        <p>&copy; {{ current_year }} Your Company Name</p>          
+
     </footer>          
 </body>          
 </html>  

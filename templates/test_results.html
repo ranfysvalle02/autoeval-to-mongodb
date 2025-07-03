@@ -3,234 +3,16 @@
 <head>  
     <meta charset="UTF-8">  
     <title>Test Results</title>  
-    <!-- Include Google Fonts and Font Awesome -->  
-    <link rel="preconnect" href="https://fonts.googleapis.com">  
-    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">  
+     <!-- Include Google Fonts -->          
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">          
+    <link href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Double:wght@100..900&display=swap" rel="stylesheet">
+
     <!-- Include Font Awesome for Icons -->  
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>  
-  
-    <!-- Embedded CSS Styles -->  
-    <style>  
-        /* Global Styles */  
-        body {  
-            margin: 0;  
-            font-family: 'Roboto', sans-serif;  
-            background-color: #ffffff;  
-            color: #212529;  
-        }  
-  
-        header, footer {  
-            background-color: #343a40;  
-            color: #f8f9fa;  
-            padding: 1em 0;  
-            text-align: center;  
-            position: sticky;  
-            top: 0;  
-            z-index: 1000;  
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);  
-        }  
-  
-        header h1 {  
-            margin: 0;  
-            font-weight: normal;  
-        }  
-  
-        main {  
-            padding: 2em;  
-            max-width: 1200px;  
-            margin: 0 auto;  
-        }  
-  
-        h2 {  
-            color: #343a40;  
-            margin-top: 1.5em;  
-        }  
-  
-        a {  
-            color: #007bff;  
-            text-decoration: none;  
-        }  
-  
-        a:hover {  
-            text-decoration: underline;  
-        }  
-  
-        /* Button Styles */  
-        .btn {  
-            display: inline-block;  
-            padding: 0.5em 1em;  
-            margin: 0.2em 0;  
-            background-color: #007bff;  
-            color: #fff;  
-            border: none;  
-            border-radius: 4px;  
-            cursor: pointer;  
-            transition: background-color 0.3s ease, transform 0.1s ease;  
-            text-decoration: none;  
-            text-align: center;  
-        }  
-  
-        .btn:hover {  
-            background-color: #0056b3;  
-            transform: translateY(-2px);  
-        }  
-  
-        .btn:active {  
-            transform: translateY(0);  
-        }  
-  
-        .btn.icon {  
-            padding: 0.5em;  
-            width: 2.5em;  
-            height: 2.5em;  
-            text-align: center;  
-        }  
-  
-        .btn.icon i {  
-            margin: 0;  
-        }  
-  
-        .form-group {  
-            margin-bottom: 1.5em;  
-        }  
-  
-        .form-group label {  
-            display: block;  
-            font-weight: bold;  
-            margin-bottom: 0.5em;  
-        }  
-  
-        pre {  
-            background-color: #f8f9fa;  
-            padding: 1em;  
-            border-radius: 5px;  
-            overflow-x: auto;  
-        }  
-  
-        table {  
-            width: 100%;  
-            border-collapse: collapse;  
-            margin-bottom: 1.5em;  
-        }  
-  
-        table th, table td {  
-            padding: 1em;  
-            border-bottom: 1px solid #dee2e6;  
-            text-align: left;  
-            vertical-align: top;  
-        }  
-  
-        table thead {  
-            background-color: #343a40;  
-            color: #f8f9fa;  
-        }  
-  
-        /* Modal Styles */  
-        .modal {  
-            display: none; /* Hidden by default */  
-            position: fixed; /* Stay in place */  
-            z-index: 10000; /* Sit on top */  
-            left: 0;  
-            top: 0;  
-            width: 100%; /* Full width */  
-            height: 100%; /* Full height */  
-            overflow: auto; /* Enable scroll if needed */  
-            background-color: rgba(0,0,0,0.5); /* Black w/ opacity */  
-        }  
-  
-        .modal-content {  
-            background-color: #ffffff;  
-            margin: 5% auto;  
-            padding: 2em;  
-            border: 1px solid #888;  
-            width: 80%;  
-            max-width: 800px;  
-            border-radius: 5px;  
-            position: relative;  
-            overflow-y: auto; /* Enable vertical scrolling if content is long */  
-            max-height: 80vh; /* Limit the modal height to 80% of viewport */  
-        }  
-  
-        .modal-content .close {  
-            color: #aaa;  
-            position: absolute;  
-            right: 1em;  
-            top: 1em;  
-            font-size: 28px;  
-            font-weight: bold;  
-            text-decoration: none;  
-        }  
-  
-        .modal-content .close:hover,  
-        .modal-content .close:focus {  
-            color: black;  
-            text-decoration: none;  
-            cursor: pointer;  
-        }  
-  
-        /* Styles for chat messages */  
-        .chat-message {  
-            display: flex;  
-            margin-bottom: 1em;  
-        }  
-  
-        .chat-message .avatar {  
-            width: 50px;  
-            margin-right: 1em;  
-            text-align: center;  
-        }  
-  
-        .chat-message .avatar i {  
-            font-size: 2em;  
-            color: #7f8c8d;  
-        }  
-  
-        .chat-message .message-content {  
-            padding: 1em;  
-            border-radius: 10px;  
-            max-width: 80%;  
-            word-wrap: break-word;  
-        }  
-  
-        .chat-message.system .message-content {  
-            background-color: #f1f1f1;  
-            color: #212529;  
-        }  
-  
-        .chat-message.user .message-content {  
-            background-color: #007bff;  
-            color: #fff;  
-        }  
-  
-        .chat-message.assistant .message-content {  
-            background-color: #28a745;  
-            color: #ffffff;  
-        }  
-  
-        .chat-message .message-content pre {  
-            margin: 0;  
-            white-space: pre-wrap; /* Wrap long lines */  
-            word-wrap: break-word;  
-            color: black;
-            font-weight: bold;
-        }  
-  
-        /* Responsive Design */  
-        @media (max-width: 768px) {  
-            main {  
-                padding: 1em;  
-            }  
-            table th, table td {  
-                padding: 0.5em;  
-            }  
-            .modal-content {  
-                width: 95%;  
-            }  
-            .chat-message .message-content {  
-                max-width: 100%;  
-            }  
-        }  
-    </style>  
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>          
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>
+    
   
     <!-- Embedded JavaScript -->  
     <script>  
@@ -302,8 +84,12 @@
 </head>  
 <body>  
     <header>  
-        <h1>Test Run Results</h1>  
-    </header>  
+        <div class="logo-container">  
+            <img src="https://mongodb.gallerycdn.vsassets.io/extensions/mongodb/mongodb-vscode/1.13.3/1749482419080/Microsoft.VisualStudio.Services.Icons.Default" alt="MongoDB Logo">  
+            <img src="https://res.cloudinary.com/ilaeweb/image/upload/c_fill,w_600,g_auto,q_auto,dpr_3.0,f_auto/ilae-climate-change-commission-brainleafsolus-colour2_D6D4D903-A7B7-9F1F-3758BEC807504AD1.png" alt="Additional Logo">  
+            <h1>MDBEvalHub: Test Run Results</h1>  
+        </div>  
+    </header>   
   
     <main>  
         <section>  
@@ -395,7 +181,7 @@
     </div>  
   
     <footer>  
-        <p>&copy; {{ current_year }} Your Company Name</p>  
+
     </footer>  
 </body>  
 </html>  

@@ -959,7 +959,7 @@ def index():
   
     default_response_criteria = """  
 - Provide a concise answer to the question based ONLY on the context.  
-    """.strip()  
+ow     """.strip()  
     default_system_prompt = """  
 Below is the context, which includes plots of movies.  
   
