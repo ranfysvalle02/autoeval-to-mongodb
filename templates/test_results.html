@@ -145,7 +145,7 @@
                                 {% endfor %}  
                                 <td>  
                                     <input type="hidden" id="messagesData_{{ case.test_case_id }}_{{ deployment_name }}" value='{{ case.messages | tojson }}'>  
-                                    <button type="button" class="btn" onclick="openMessagesModal('{{ case.test_case_id }}', '{{ deployment_name }}')"><i class="fa fa-comments"></i> View Messages</button>  
+                                    <button type="button" class="btn" onclick="openMessagesModal('{{ case.test_case_id }}', '{{ deployment_name }}')"><i class="fa fa-comments"></i> &gt;</button>  
                                 </td>  
                             </tr>  
                             {% endfor %}  
