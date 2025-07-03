@@ -601,12 +601,16 @@ class MDBAutoEval:
                                 )  
                         elif isinstance(evaluator, LLMClassifier):  
                             result = evaluator.eval(  
-                                output=generated_output  
+                                output=generated_output,  
+                                input=input_prompt,  
+                                expected=expected_output,
+                                context=context_str,  # Pass context if needed
                             )  
                         elif isinstance(evaluator, (ContextRelevancy, Faithfulness)):  
                             result = evaluator.eval(  
                                 input=input_prompt,  
                                 output=generated_output,  
+                                expected=expected_output,
                                 context=context_str  
                             )  
                         else:  
