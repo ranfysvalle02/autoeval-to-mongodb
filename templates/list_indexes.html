@@ -4,35 +4,46 @@
 <head>  
     <meta charset="UTF-8">  
     <title>Manage Atlas Search Indexes</title>  
-     <!-- Include Google Fonts -->          
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">          
-    <link href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Double:wght@100..900&display=swap" rel="stylesheet">
-
-    
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>          
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>
-    
+    <!-- Include Google Fonts -->  
+    <link rel="preconnect" href="https://fonts.googleapis.com">  
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>  
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">  
+    <link href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Double:wght@100..900&display=swap" rel="stylesheet">  
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>  
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>  
 </head>  
 <body>  
     <header>  
-        <div class="logo-container">  
-            <img src="https://mongodb.gallerycdn.vsassets.io/extensions/mongodb/mongodb-vscode/1.13.3/1749482419080/Microsoft.VisualStudio.Services.Icons.Default" alt="MongoDB Logo">  
-            <img src="https://res.cloudinary.com/ilaeweb/image/upload/c_fill,w_600,g_auto,q_auto,dpr_3.0,f_auto/ilae-climate-change-commission-brainleafsolus-colour2_D6D4D903-A7B7-9F1F-3758BEC807504AD1.png" alt="Additional Logo">  
-            <h1>MDBEvalHub: Atlas Search Indexes</h1>  
+        <div class="header-container">  
+            <div class="logo-container">  
+                <img src="https://mongodb.gallerycdn.vsassets.io/extensions/mongodb/mongodb-vscode/1.13.3/1749482419080/Microsoft.VisualStudio.Services.Icons.Default" alt="MongoDB Logo">  
+                <img src="https://res.cloudinary.com/ilaeweb/image/upload/c_fill,w_600,g_auto,q_auto,dpr_3.0,f_auto/ilae-climate-change-commission-brainleafsolus-colour2_D6D4D903-A7B7-9F1F-3758BEC807504AD1.png" alt="Additional Logo">  
+                <h1>MDBEvalHub: Create New Index</h1>  
+            </div>  
+            <div class="header-buttons">  
+                <a href="/" class="btn header-btn">Back to Home</a>  
+            </div>  
         </div>  
-    </header>   
+    </header>  
   
-    <nav>    
-        <ul >
-            <li><a href="/" class="btn" style="height: 30px; border-radius: 0;"><i class="fa fa-home"></i> Back to Home</a>  </li>
-            <li>&nbsp;</li>
-        </ul> 
-    </nav> 
+    <!-- Wizard Navigation Buttons -->  
+    <div class="wizard-navigation">  
+        <button type="button" id="prevBtn" onclick="nextPrev(-1)" class="btn"><i class="fa fa-arrow-left"></i> Previous</button>  
+        <button type="button" id="nextBtn" onclick="nextPrev(1)" class="btn primary">Next <i class="fa fa-arrow-right"></i></button>  
+        <!-- Submit Button -->  
+        <button type="submit" id="submitBtn" class="btn primary" form="create_index_form" onclick="showLoading()" style="display: none;"><i class="fa fa-check"></i> Create Index</button>  
+    </div>  
+  
+    <!-- Wizard Step Indicators -->  
+    <div class="step-indicators">  
+        <span class="step active">1. Select Source</span>  
+        <span class="step">2. Configure Fields</span>  
+        <span class="step">3. Optional Filters</span>  
+        <span class="step">4. Select Models</span>  
+        <span class="step">5. Review & Create</span>  
+    </div>  
   
     <main>  
-        <section>
         {% if error_message %}  
             <p class="error">{{ error_message }}</p>  
         {% endif %}  
@@ -40,77 +51,126 @@
             <p class="success">{{ success_message }}</p>  
         {% endif %}  
   
-        <h2>Create New Index</h2>  
-        <form method="post" action="{{ url_for('list_indexes') }}">  
-            <input type="hidden" name="action" value="create_index">  
-            <div class="form-group">  
-                <label for="db_name">Source Database:</label>  
-                <select id="db_name" name="db_name" required>  
-                    <option value="">-- Select Database --</option>  
-                    {% for db in source_databases %}  
-                        <option value="{{ db.name }}">{{ db.name }}</option>  
-                    {% endfor %}  
-                </select>  
-            </div>  
-            <div class="form-group">  
-                <label for="collection_name">Source Collection:</label>  
-                <select id="collection_name" name="collection_name" required>  
-                    <option value="">-- Select Collection --</option>  
-                    <!-- Options will be populated via JavaScript -->  
-                </select>  
-            </div>  
-            <div class="form-group">  
-                <label for="source_field">Source Field:</label>  
-                <select id="source_field" name="source_field" required>  
-                    <option value="">-- Select Source Field --</option>  
-                    <!-- Options will be populated via JavaScript -->  
-                </select>  
-            </div>  
-            <div class="form-group">  
-                <label for="embedding_field">Embedding Field Prefix:</label>  
-                <input type="text" id="embedding_field" name="embedding_field" required placeholder="Enter field prefix for embeddings">  
-                <small>Embedding fields will be named as [prefix][ModelName]</small>  
-            </div>  
-            <div class="form-group">  
-                <label for="match_stage">Match Stage (JSON format):</label>  
-                <textarea id="match_stage" name="match_stage" placeholder='Enter JSON for $match stage (e.g., {"field": "value"})'></textarea>  
-                <small>Optional: Provide a $match stage to filter documents when cloning.</small>  
-            </div>  
-            <div class="form-group">  
-                <label>Embedding Models:</label>  
-                {% for model_name, model_info in embedding_models.items() %}  
-                    <div>  
-                        <input type="checkbox" id="model_{{ model_name }}" name="embedding_models" value="{{ model_name }}">  
-                        <label for="model_{{ model_name }}">{{ model_name }}</label>  
+        <!-- Wizard Form -->  
+        <section>  
+            <form id="create_index_form" method="post" action="{{ url_for('list_indexes') }}">  
+                <input type="hidden" name="action" value="create_index">  
+  
+                <!-- Tab 1: Select Source Database and Collection -->  
+                <div class="tab">  
+                    <h3>Select Source Database and Collection</h3>  
+                    <div class="form-group">  
+                        <label for="db_name">Source Database:</label>  
+                        <select id="db_name" name="db_name" required>  
+                            <option value="">-- Select Database --</option>  
+                            {% for db in source_databases %}  
+                                <option value="{{ db.name }}">{{ db.name }}</option>  
+                            {% endfor %}  
+                        </select>  
                     </div>  
-                {% endfor %}  
-            </div>  
-            <div class="form-group">  
-                <label for="records_limit">Number of Records to Process (Default 100):</label>  
-                <input type="number" id="records_limit" name="records_limit" value="100" min="1">  
-            </div>  
-            <!-- We default to cosine similarity and do not expose it to the user -->  
-            <div class="form-actions">  
-                <button type="submit" class="btn">Create Index</button>  
-            </div>  
-        </form>          
-        </section>
+                    <div class="form-group">  
+                        <label for="collection_name">Source Collection:</label>  
+                        <select id="collection_name" name="collection_name" required>  
+                            <option value="">-- Select Collection --</option>  
+                            <!-- Options will be populated via JavaScript -->  
+                        </select>  
+                    </div>  
+                </div>  
+  
+                <!-- Tab 2: Configure Fields -->  
+                <div class="tab">  
+                    <h3>Select Source Field and Embedding Field Prefix</h3>  
+                    <div class="form-group">  
+                        <label for="source_field">Source Field:</label>  
+                        <select id="source_field" name="source_field" required>  
+                            <option value="">-- Select Source Field --</option>  
+                            <!-- Options will be populated via JavaScript -->  
+                        </select>  
+                    </div>  
+                    <div class="form-group">  
+                        <label for="embedding_field">Embedding Field Prefix:</label>  
+                        <input type="text" id="embedding_field" name="embedding_field" required placeholder="Enter field prefix for embeddings">  
+                        <small>Embedding fields will be named as [prefix][ModelName]</small>  
+                    </div>  
+                </div>  
+  
+                <!-- Tab 3: Optional Filters -->  
+                <div class="tab">  
+                    <h3>Optional: Provide Filters and Limit</h3>  
+                    <div class="form-group">  
+                        <label for="match_stage">Match Stage (JSON format):</label>  
+                        <textarea id="match_stage" name="match_stage" placeholder='Enter JSON for $match stage (e.g., {"field": "value"})'></textarea>  
+                        <small>Optional: Provide a $match stage to filter documents when cloning.</small>  
+                    </div>  
+                    <div class="form-group">  
+                        <label for="records_limit">Number of Records to Process (Default 100):</label>  
+                        <input type="number" id="records_limit" name="records_limit" value="100" min="1">  
+                    </div>  
+                </div>  
+  
+                <!-- Tab 4: Select Embedding Models -->  
+                <div class="tab">  
+                    <h3>Select Embedding Models</h3>  
+                    <div class="form-group">  
+                        <label>Embedding Models:</label>  
+                        {% for model_name, model_info in embedding_models.items() %}  
+                            <div>  
+                                <input type="checkbox" id="model_{{ model_name }}" name="embedding_models" value="{{ model_name }}">  
+                                <label for="model_{{ model_name }}">{{ model_name }}</label>  
+                            </div>  
+                        {% endfor %}  
+                    </div>  
+                </div>  
+  
+                <!-- Tab 5: Review & Create -->  
+                <div class="tab">  
+                    <h3>Review and Create Index</h3>  
+                    <p>Please review your selections before creating the index.</p>  
+                    <ul>  
+                        <li><strong>Source Database:</strong> <span id="review_db_name"></span></li>  
+                        <li><strong>Source Collection:</strong> <span id="review_collection_name"></span></li>  
+                        <li><strong>Source Field:</strong> <span id="review_source_field"></span></li>  
+                        <li><strong>Embedding Field Prefix:</strong> <span id="review_embedding_field"></span></li>  
+                        <li><strong>Match Stage:</strong> <span id="review_match_stage"></span></li>  
+                        <li><strong>Records Limit:</strong> <span id="review_records_limit"></span></li>  
+                        <li><strong>Selected Embedding Models:</strong> <span id="review_embedding_models"></span></li>  
+                    </ul>  
+                </div>  
+  
+            </form>  
+        </section>  
     </main>  
   
+    <!-- Loading Indicator for Creating Index -->  
+    <div id="loadingModal" class="modal">  
+        <div class="modal-content loading-modal-content">  
+            <div class="logo-container">  
+                <img src="https://mongodb.gallerycdn.vsassets.io/extensions/mongodb/mongodb-vscode/1.13.3/1749482419080/Microsoft.VisualStudio.Services.Icons.Default" alt="MongoDB Logo">  
+                <img src="https://res.cloudinary.com/ilaeweb/image/upload/c_fill,w_600,g_auto,q_auto,dpr_3.0,f_auto/ilae-climate-change-commission-brainleafsolus-colour2_D6D4D903-A7B7-9F1F-3758BEC807504AD1.png" alt="Additional Logo">  
+                <h1>MDBEvalHub</h1>  
+            </div>  
+            <div class="spinner">  
+                <div class="bounce1"></div>  
+                <div class="bounce2"></div>  
+            </div>  
+            <p>Processing...</p>  
+        </div>  
+    </div>  
+  
+    <!-- Fixed Bottom Navigation -->  
+    <div class="bottom-nav">  
+        
+    </div>  
+  
     <footer>  
-
+        <!-- Footer content -->  
     </footer>  
   
-    <!-- JavaScript for Accordion and Dynamic Collection Loading -->  
+    <!-- JavaScript for Wizard and Dynamic Field Loading -->  
     <script>  
-        function toggleAccordion(element) {  
-            element.classList.toggle("active");  
-            var content = element.nextElementSibling;  
-            if (content.style.display === "block") {  
-                content.style.display = "none";  
-            } else {  
-                content.style.display = "block";  
-            }  
+        // Include the showLoading function  
+        function showLoading() {  
+            document.getElementById('loadingModal').style.display = 'block';  
         }  
   
         // Create a mapping of databases to their collections  
@@ -123,7 +183,7 @@
             ];  
         {% endfor %}  
   
-        // Create a mapping of collection to their fields  
+        // Create a mapping of collections to their fields  
         var collectionFields = {};  
         {% for db in source_databases %}  
             {% for collection in db.collections %}  
@@ -140,8 +200,11 @@
             var dbName = this.value;  
             var collectionSelect = document.getElementById('collection_name');  
             var sourceFieldSelect = document.getElementById('source_field');  
+  
+            // Clear existing options  
             collectionSelect.innerHTML = '<option value="">-- Select Collection --</option>';  
             sourceFieldSelect.innerHTML = '<option value="">-- Select Source Field --</option>';  
+  
             if (dbName !== '') {  
                 var collections = dbCollections[dbName] || [];  
                 collections.forEach(function(collectionName) {  
@@ -158,7 +221,10 @@
             var dbName = document.getElementById('db_name').value;  
             var collectionName = this.value;  
             var sourceFieldSelect = document.getElementById('source_field');  
+  
+            // Clear existing options  
             sourceFieldSelect.innerHTML = '<option value="">-- Select Source Field --</option>';  
+  
             if (dbName !== '' && collectionName !== '') {  
                 var key = dbName + '.' + collectionName;  
                 var fields = collectionFields[key] || [];  
@@ -170,6 +236,102 @@
                 });  
             }  
         });  
+  
+        // Wizard Navigation Functions  
+        function showTab(n) {  
+            var tabs = document.getElementsByClassName("tab");  
+            // Hide all tabs  
+            for (var i = 0; i < tabs.length; i++) {  
+                tabs[i].style.display = "none";  
+                tabs[i].classList.remove("fade-in-left", "fade-in-right", "fade-out-left", "fade-out-right");  
+            }  
+  
+            // Determine animation direction  
+            if (n > currentTab) {  
+                tabs[n].classList.add("fade-in-right");  
+            } else if (n < currentTab) {  
+                tabs[n].classList.add("fade-in-left");  
+            }  
+            tabs[n].style.display = "block";  
+  
+            // Update the "active" class on step indicators  
+            var steps = document.getElementsByClassName("step");  
+            for (var i = 0; i < steps.length; i++) {  
+                steps[i].classList.remove("active");  
+            }  
+            steps[n].classList.add("active");  
+  
+            currentTab = n;  
+            updateButtonVisibility();  
+            if (n == tabs.length - 1) {  
+                // If last tab, update the review  
+                updateReview();  
+            }  
+        }  
+  
+        function nextPrev(n) {  
+            var tabs = document.getElementsByClassName("tab");  
+            // Add exit animation to current tab  
+            if (n > 0) {  
+                tabs[currentTab].classList.add("fade-out-left");  
+            } else {  
+                tabs[currentTab].classList.add("fade-out-right");  
+            }  
+            setTimeout(function() {  
+                // Hide the current tab  
+                tabs[currentTab].style.display = "none";  
+                // Increase or decrease the current tab by n  
+                currentTab = currentTab + n;  
+                // Display the correct tab  
+                showTab(currentTab);  
+            }, 300); // Match this timeout with the animation duration  
+        }  
+  
+        function updateButtonVisibility() {  
+            var tabs = document.getElementsByClassName("tab");  
+            var prevBtn = document.getElementById("prevBtn");  
+            var nextBtn = document.getElementById("nextBtn");  
+            var submitBtn = document.getElementById("submitBtn");  
+  
+            if (currentTab == 0) {  
+                prevBtn.style.display = "none";  
+            } else {  
+                prevBtn.style.display = "inline";  
+            }  
+            if (currentTab == (tabs.length - 1)) {  
+                nextBtn.style.display = "none";  
+                submitBtn.style.display = "inline";  
+            } else {  
+                nextBtn.style.display = "inline";  
+                submitBtn.style.display = "none";  
+            }  
+        }  
+  
+        function updateReview() {  
+            // Update the review section with selected values  
+            document.getElementById('review_db_name').innerText = document.getElementById('db_name').value || 'N/A';  
+            document.getElementById('review_collection_name').innerText = document.getElementById('collection_name').value || 'N/A';  
+            document.getElementById('review_source_field').innerText = document.getElementById('source_field').value || 'N/A';  
+            document.getElementById('review_embedding_field').innerText = document.getElementById('embedding_field').value || 'N/A';  
+            var matchStage = document.getElementById('match_stage').value.trim();  
+            document.getElementById('review_match_stage').innerText = matchStage ? matchStage : 'None';  
+            document.getElementById('review_records_limit').innerText = document.getElementById('records_limit').value || '100';  
+  
+            var selectedModels = [];  
+            var modelCheckboxes = document.getElementsByName('embedding_models');  
+            for (var i = 0; i < modelCheckboxes.length; i++) {  
+                if (modelCheckboxes[i].checked) {  
+                    selectedModels.push(modelCheckboxes[i].value);  
+                }  
+            }  
+            document.getElementById('review_embedding_models').innerText = selectedModels.length ? selectedModels.join(', ') : 'None selected';  
+        }  
+  
+        var currentTab = 0; // Current tab is set to be the first tab (0)  
+        document.addEventListener('DOMContentLoaded', function() {  
+            showTab(currentTab); // Display the current tab  
+        });  
+  
     </script>  
 </body>  
 </html>  

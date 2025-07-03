@@ -1,196 +1,284 @@
-<!DOCTYPE html>    
-<html lang="en">    
-<head>    
-    <meta charset="UTF-8">    
-    <title>Manage Evaluators</title>    
-     <!-- Include Google Fonts -->          
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">          
-    <link href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Double:wght@100..900&display=swap" rel="stylesheet">
-
-    <!-- Include Font Awesome for Icons -->    
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>          
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>
-      
-</head>    
-<body>    
+<!-- manage_evaluators.html -->  
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>Manage Evaluators</title>  
+    <!-- Include Google Fonts -->  
+    <link rel="preconnect" href="https://fonts.googleapis.com">  
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>  
+    <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">  
+    <link href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Double:wght@100..900&display=swap" rel="stylesheet">  
+  
+    <!-- Include Font Awesome for Icons -->  
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>  
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>  
+  
+</head>  
+<body>  
     <header>  
-        <div class="logo-container">  
-            <img src="https://mongodb.gallerycdn.vsassets.io/extensions/mongodb/mongodb-vscode/1.13.3/1749482419080/Microsoft.VisualStudio.Services.Icons.Default" alt="MongoDB Logo">  
-            <img src="https://res.cloudinary.com/ilaeweb/image/upload/c_fill,w_600,g_auto,q_auto,dpr_3.0,f_auto/ilae-climate-change-commission-brainleafsolus-colour2_D6D4D903-A7B7-9F1F-3758BEC807504AD1.png" alt="Additional Logo">  
-            <h1>MDBEvalHub : Manage Evaluators</h1>  
+        <div class="header-container">  
+            <div class="logo-container">  
+                <img src="https://mongodb.gallerycdn.vsassets.io/extensions/mongodb/mongodb-vscode/1.13.3/1749482419080/Microsoft.VisualStudio.Services.Icons.Default" alt="MongoDB Logo">  
+                <img src="https://res.cloudinary.com/ilaeweb/image/upload/c_fill,w_600,g_auto,q_auto,dpr_3.0,f_auto/ilae-climate-change-commission-brainleafsolus-colour2_D6D4D903-A7B7-9F1F-3758BEC807504AD1.png" alt="Additional Logo">  
+                <h1>MDBEvalHub: New Evaluator</h1>  
+            </div>  
+            <div class="header-buttons">  
+                <a href="/" class="btn header-btn">Back to Home</a>  
+            </div>  
         </div>  
-    </header>    
+    </header>  
   
-    <!-- Navigation Menu -->    
-    <nav>    
-        <ul >
-            <li><a href="/" class="btn" style="height: 30px; border-radius: 0;"><i class="fa fa-home"></i> Back to Home</a>  </li>
-            <li>&nbsp;</li>
-        </ul> 
-    </nav>    
+    <!-- Wizard Navigation Buttons -->  
+    <div class="wizard-navigation">  
+        <button type="button" id="prevBtn" onclick="nextPrev(-1)" class="btn"><i class="fa fa-arrow-left"></i> Previous</button>  
+        <button type="button" id="nextBtn" onclick="nextPrev(1)" class="btn primary">Next <i class="fa fa-arrow-right"></i></button>  
+        <!-- Submit Button -->  
+        <button type="submit" id="submitBtn" class="btn primary" form="create_evaluator_form" onclick="showLoading()" style="display: none;"><i class="fa fa-check"></i> Create Evaluator</button>  
+    </div>  
   
-    <main>    
-        <section>
-        {% if error_message %}    
-            <p class="error">{{ error_message }}</p>    
-        {% endif %}    
-        {% if success_message %}    
-            <p class="success">{{ success_message }}</p>    
-        {% endif %}    
+    <!-- Wizard Step Indicators -->  
+    <div class="step-indicators">  
+        <span class="step active">1. Evaluator Type</span>  
+        <span class="step">2. Configuration</span>  
+        <span class="step">3. Review & Create</span>  
+    </div>  
   
-        <h2>Create New Evaluator</h2>    
-        <form method="post" action="{{ url_for('manage_evaluators') }}">    
-            <input type="hidden" name="action" value="create_evaluator">    
-            <div class="form-group">    
-                <label for="name">Evaluator Name:</label>    
-                <input type="text" id="name" name="name" required placeholder="Enter evaluator name">    
-            </div>    
-            <div class="form-group">    
-                <label for="evaluator_type">Evaluator Type:</label>    
-                <select id="evaluator_type" name="evaluator_type" required onchange="toggleEvaluatorFields()">    
-                    <option value="">-- Select Evaluator Type --</option>    
-                    {% for etype in evaluator_types %}    
-                        <option value="{{ etype }}">{{ etype }}</option>    
-                    {% endfor %}    
-                </select>    
-            </div>    
+    <!-- Main Content -->  
+    <main>  
+        {% if error_message %}  
+            <p class="error">{{ error_message }}</p>  
+        {% endif %}  
+        {% if success_message %}  
+            <p class="success">{{ success_message }}</p>  
+        {% endif %}  
   
-            <!-- Fields for LLMClassifier -->    
-            <div id="llm_fields" style="display: none;">    
-                <div class="form-group">    
-                    <label for="prompt_template">Prompt Template:</label>    
-                    <textarea id="prompt_template" name="prompt_template" placeholder="Enter prompt template"></textarea>    
-                </div>    
-                <div class="form-group">    
-                    <label for="choice_scores">Choice Scores (JSON format):</label>    
-                    <textarea id="choice_scores" name="choice_scores" placeholder='e.g., {"Yes": 1.0, "No": 0.0}'></textarea>    
-                </div>    
-                <div class="form-group">    
-                    <label for="use_cot">Use Chain-of-Thought:</label>    
-                    <input type="checkbox" id="use_cot" name="use_cot">    
-                </div>    
-                <div class="form-group">    
-                    <label for="model_deployment_name">Model Deployment Name:</label>    
-                    <select id="model_deployment_name" name="model_deployment_name">    
-                        {% for deployment_name in deployment_names %}    
-                            <option value="{{ deployment_name }}" {% if deployment_name == default_deployment %}selected{% endif %}>{{ deployment_name }}</option>    
-                        {% endfor %}    
-                    </select>    
-                </div>    
-                <div class="form-group">    
-                    <label for="temperature">Temperature:</label>    
-                    <input type="number" id="temperature" name="temperature" value="0.0" step="0.1" min="0.0" max="1.0">    
-                </div>    
-            </div>    
+        <!-- Wizard Form -->  
+        <section>  
+            <form id="create_evaluator_form" method="post" action="{{ url_for('manage_evaluators') }}">  
+                <input type="hidden" name="action" value="create_evaluator">  
   
-            <!-- Fields for FunctionEvaluator -->    
-            <div id="function_fields" style="display: none;">    
-                <div class="form-group">    
-                    <label for="function_subtype">Function Subtype:</label>    
-                    <select id="function_subtype" name="function_subtype" onchange="populateFunctionDefaults()">    
-                        <option value="">-- Select Function Subtype --</option>    
-                        {% for fsubtype in function_subtypes %}    
-                            <option value="{{ fsubtype }}">{{ fsubtype }}</option>    
-                        {% endfor %}    
-                    </select>    
-                </div>    
-                <div class="form-group">    
-                    <label for="parameters">Parameters (JSON format):</label>    
-                    <textarea id="parameters" name="parameters" placeholder='Enter JSON for parameters (e.g., {"pattern": "\\d+"})'></textarea>    
-                    <small>Provide necessary parameters for the selected function subtype.</small>    
-                </div>    
-            </div>    
+                <!-- Tab 1: Evaluator Type -->  
+                <div class="tab">  
+                    <h3>Select Evaluator Type</h3>  
+                    <div class="form-group">  
+                        <label for="evaluator_type">Evaluator Type:</label>  
+                        <select id="evaluator_type" name="evaluator_type" required onchange="toggleEvaluatorFields(); nextPrev(0);">  
+                            <option value="">-- Select Evaluator Type --</option>  
+                            {% for etype in evaluator_types %}  
+                                <option value="{{ etype }}">{{ etype }}</option>  
+                            {% endfor %}  
+                        </select>  
+                    </div>  
+                </div>  
   
-            <div class="form-actions">    
-                <button type="submit" class="btn">Create Evaluator</button>    
-            </div>    
-        </form>    
+                <!-- Tab 2: Configuration -->  
+                <div class="tab">  
+                    <h3>Configure Evaluator</h3>  
+                    <!-- Shared Field: Evaluator Name -->  
+                    <div class="form-group">  
+                        <label for="name">Evaluator Name:</label>  
+                        <input type="text" id="name" name="name" required placeholder="Enter evaluator name">  
+                    </div>  
   
-        <h2>Existing Evaluators</h2>    
-        {% if evaluators %}    
-            <table>    
-                <thead>    
-                    <tr>    
-                        <th>Name</th>    
-                        <th>Type</th>    
-                        <th>Details</th>    
-                        <th>Actions</th>    
-                    </tr>    
-                </thead>    
-                <tbody>    
-                    {% for evaluator in evaluators %}    
-                        <tr>    
-                            <td>{{ evaluator.name }}</td>    
-                            <td>{{ evaluator.type }}</td>    
-                            <td>    
-                                {% if evaluator.type == 'LLMClassifier' %}    
-                                    <strong>Choice Scores:</strong>    
-                                    <pre>{{ evaluator.choice_scores_str }}</pre>    
-                                    <strong>Prompt Template:</strong>    
-                                    <pre>{{ evaluator.prompt_template }}</pre>    
-                                    <strong>Use Chain-of-Thought:</strong> {{ 'Yes' if evaluator.use_cot else 'No' }}<br>    
-                                    <strong>Model Deployment Name:</strong> {{ evaluator.model_deployment_name }}<br>    
-                                    <strong>Temperature:</strong> {{ evaluator.temperature }}    
-                                {% elif evaluator.type == 'FunctionEvaluator' %}    
-                                    <strong>Function Subtype:</strong> {{ evaluator.function_subtype }}<br>    
-                                    <strong>Parameters:</strong>    
-                                    <pre>{{ evaluator.parameters_str }}</pre>    
-                                {% endif %}    
-                            </td>    
-                            <td>    
-                                <form method="post" action="{{ url_for('manage_evaluators') }}">    
-                                    <input type="hidden" name="action" value="delete_evaluator">    
-                                    <input type="hidden" name="evaluator_id" value="{{ evaluator._id }}">    
-                                    <button type="submit" class="btn">Delete</button>    
-                                </form>    
-                            </td>    
-                        </tr>    
-                    {% endfor %}    
-                </tbody>    
-            </table>    
-        {% else %}    
-            <p>No evaluators found.</p>    
-        {% endif %}   
-        </section> 
-    </main>    
+                    <!-- Fields for LLMClassifier -->  
+                    <div id="llm_fields" style="display: none;">  
+                        <div class="form-group">  
+                            <label for="prompt_template">Prompt Template:</label>  
+                            <textarea id="prompt_template" name="prompt_template" placeholder="Enter prompt template"></textarea>  
+                        </div>  
+                        <div class="form-group">  
+                            <label for="choice_scores">Choice Scores (JSON format):</label>  
+                            <textarea id="choice_scores" name="choice_scores" placeholder='e.g., {"Yes": 1.0, "No": 0.0}'></textarea>  
+                        </div>  
+                        <div class="form-group">  
+                            <label for="use_cot">Use Chain-of-Thought:</label>  
+                            <input type="checkbox" id="use_cot" name="use_cot">  
+                        </div>  
+                        <div class="form-group">  
+                            <label for="model_deployment_name">Model Deployment Name:</label>  
+                            <select id="model_deployment_name" name="model_deployment_name">  
+                                {% for deployment_name in deployment_names %}  
+                                    <option value="{{ deployment_name }}" {% if deployment_name == default_deployment %}selected{% endif %}>{{ deployment_name }}</option>  
+                                {% endfor %}  
+                            </select>  
+                        </div>  
+                        <div class="form-group">  
+                            <label for="temperature">Temperature:</label>  
+                            <input type="number" id="temperature" name="temperature" value="0.0" step="0.1" min="0.0" max="1.0">  
+                        </div>  
+                    </div>  
   
-    <footer>    
-
-    </footer>    
+                    <!-- Fields for FunctionEvaluator -->  
+                    <div id="function_fields" style="display: none;">  
+                        <div class="form-group">  
+                            <label for="function_subtype">Function Subtype:</label>  
+                            <select id="function_subtype" name="function_subtype" onchange="populateFunctionDefaults()">  
+                                <option value="">-- Select Function Subtype --</option>  
+                                {% for fsubtype in function_subtypes %}  
+                                    <option value="{{ fsubtype }}">{{ fsubtype }}</option>  
+                                {% endfor %}  
+                            </select>  
+                        </div>  
+                        <div class="form-group">  
+                            <label for="parameters">Parameters (JSON format):</label>  
+                            <textarea id="parameters" name="parameters" placeholder='Enter JSON for parameters (e.g., {"pattern": "\\d+"})'></textarea>  
+                            <small>Provide necessary parameters for the selected function subtype.</small>  
+                        </div>  
+                    </div>  
+                </div>  
   
-    <!-- JavaScript for Toggling Fields and Setting Default Examples -->    
-    <script>    
-        function toggleEvaluatorFields() {    
-            var evaluatorType = document.getElementById('evaluator_type').value;    
-            if (evaluatorType === 'LLMClassifier') {    
-                document.getElementById('llm_fields').style.display = 'block';    
-                document.getElementById('function_fields').style.display = 'none';    
+                <!-- Tab 3: Review & Create -->  
+                <div class="tab">  
+                    <h3>Review and Create Evaluator</h3>  
+                    <p>Please review your selections before creating the evaluator.</p>  
+                    <ul>  
+                        <li><strong>Evaluator Type:</strong> <span id="review_evaluator_type"></span></li>  
+                        <li><strong>Evaluator Name:</strong> <span id="review_name"></span></li>  
+                        <div id="review_llm_fields" style="display: none;">  
+                            <li><strong>Prompt Template:</strong>  
+                                <pre id="review_prompt_template"></pre>  
+                            </li>  
+                            <li><strong>Choice Scores:</strong>  
+                                <pre id="review_choice_scores"></pre>  
+                            </li>  
+                            <li><strong>Use Chain-of-Thought:</strong> <span id="review_use_cot"></span></li>  
+                            <li><strong>Model Deployment Name:</strong> <span id="review_model_deployment_name"></span></li>  
+                            <li><strong>Temperature:</strong> <span id="review_temperature"></span></li>  
+                        </div>  
+                        <div id="review_function_fields" style="display: none;">  
+                            <li><strong>Function Subtype:</strong> <span id="review_function_subtype"></span></li>  
+                            <li><strong>Parameters:</strong>  
+                                <pre id="review_parameters"></pre>  
+                            </li>  
+                        </div>  
+                    </ul>  
+                </div>  
   
-                // Populate default values for LLMClassifier    
-                populateLLMDefaults();    
+            </form>  
+        </section>  
   
-            } else if (evaluatorType === 'FunctionEvaluator') {    
-                document.getElementById('llm_fields').style.display = 'none';    
-                document.getElementById('function_fields').style.display = 'block';    
+        <!-- Modal for Existing Evaluators -->  
+        <div id="evaluatorsModal" class="modal">  
+            <div class="modal-content">  
+                <a href="javascript:void(0);" class="close" onclick="closeEvaluatorsModal()">&times;</a>  
+                <h2>Existing Evaluators</h2>  
+                <!-- Existing Evaluators Content -->  
+                {% if evaluators %}  
+                    <div class="table-responsive">  
+                        <table>  
+                            <thead>  
+                                <tr>  
+                                    <th>Name</th>  
+                                    <th>Type</th>  
+                                    <th>Details</th>  
+                                    <th>Actions</th>  
+                                </tr>  
+                            </thead>  
+                            <tbody>  
+                                {% for evaluator in evaluators %}  
+                                    <tr>  
+                                        <td>{{ evaluator.name }}</td>  
+                                        <td>{{ evaluator.type }}</td>  
+                                        <td>  
+                                            {% if evaluator.type == 'LLMClassifier' %}  
+                                                <strong>Choice Scores:</strong>  
+                                                <pre>{{ evaluator.choice_scores_str }}</pre>  
+                                                <strong>Prompt Template:</strong>  
+                                                <pre>{{ evaluator.prompt_template }}</pre>  
+                                                <strong>Use Chain-of-Thought:</strong> {{ 'Yes' if evaluator.use_cot else 'No' }}<br>  
+                                                <strong>Model Deployment Name:</strong> {{ evaluator.model_deployment_name }}<br>  
+                                                <strong>Temperature:</strong> {{ evaluator.temperature }}  
+                                            {% elif evaluator.type == 'FunctionEvaluator' %}  
+                                                <strong>Function Subtype:</strong> {{ evaluator.function_subtype }}<br>  
+                                                <strong>Parameters:</strong>  
+                                                <pre>{{ evaluator.parameters_str }}</pre>  
+                                            {% endif %}  
+                                        </td>  
+                                        <td>  
+                                            <form method="post" action="{{ url_for('manage_evaluators') }}">  
+                                                <input type="hidden" name="action" value="delete_evaluator">  
+                                                <input type="hidden" name="evaluator_id" value="{{ evaluator._id }}">  
+                                                <button type="submit" class="btn"><i class="fa fa-trash"></i> Delete</button>  
+                                            </form>  
+                                        </td>  
+                                    </tr>  
+                                {% endfor %}  
+                            </tbody>  
+                        </table>  
+                    </div>  
+                {% else %}  
+                    <p>No evaluators found.</p>  
+                {% endif %}  
+            </div>  
+        </div>  
   
-                // Clear LLM fields    
-                clearLLMFields();    
+    </main>  
   
-                // Since only 'regex_match' is available, set it by default    
-                document.getElementById('function_subtype').value = 'regex_match';    
-                populateFunctionDefaults();    
+    <!-- Loading Indicator -->  
+    <div id="loadingModal" class="modal">  
+        <div class="modal-content loading-modal-content">  
+            <div class="logo-container">  
+                <img src="https://mongodb.gallerycdn.vsassets.io/extensions/mongodb/mongodb-vscode/1.13.3/1749482419080/Microsoft.VisualStudio.Services.Icons.Default" alt="MongoDB Logo">  
+                <img src="https://res.cloudinary.com/ilaeweb/image/upload/c_fill,w_600,g_auto,q_auto,dpr_3.0,f_auto/ilae-climate-change-commission-brainleafsolus-colour2_D6D4D903-A7B7-9F1F-3758BEC807504AD1.png" alt="Additional Logo">  
+                <h1>MDBEvalHub</h1>  
+            </div>  
+            <div class="spinner">  
+                <div class="bounce1"></div>  
+                <div class="bounce2"></div>  
+            </div>  
+            <p>Processing...</p>  
+        </div>  
+    </div>  
   
-            } else {    
-                document.getElementById('llm_fields').style.display = 'none';    
-                document.getElementById('function_fields').style.display = 'none';    
+    <!-- Fixed Bottom Navigation -->  
+    <div class="bottom-nav">  
+        <ul style="list-style-type:none; margin:0; padding:0; display:flex; justify-content:space-between;">  
+            <li><button type="button" class="btn" onclick="openEvaluatorsModal()" style="border-radius:0;"><i class="fa fa-list"></i> View Existing Evaluators</button></li>  
+            <!-- Add any additional navigation items if needed -->  
+        </ul>  
+    </div>  
   
-                // Clear all fields    
-                clearLLMFields();    
-                clearFunctionFields();    
-            }    
-        }    
+    <footer>  
+  
+    </footer>  
+  
+    <!-- JavaScript for Wizard, Toggling Fields, and Setting Default Examples -->  
+    <script>  
+        // Include the showLoading function  
+        function showLoading() {  
+            document.getElementById('loadingModal').style.display = 'block';  
+        }  
+  
+        function toggleEvaluatorFields() {  
+            var evaluatorType = document.getElementById('evaluator_type').value;  
+            if (evaluatorType === 'LLMClassifier') {  
+                document.getElementById('llm_fields').style.display = 'block';  
+                document.getElementById('function_fields').style.display = 'none';  
+  
+                // Populate default values for LLMClassifier  
+                populateLLMDefaults();  
+  
+            } else if (evaluatorType === 'FunctionEvaluator') {  
+                document.getElementById('llm_fields').style.display = 'none';  
+                document.getElementById('function_fields').style.display = 'block';  
+  
+                // Clear LLM fields  
+                clearLLMFields();  
+  
+                // Since only 'regex_match' is available, set it by default  
+                document.getElementById('function_subtype').value = 'regex_match';  
+                populateFunctionDefaults();  
+  
+            } else {  
+                document.getElementById('llm_fields').style.display = 'none';  
+                document.getElementById('function_fields').style.display = 'none';  
+  
+                // Clear all fields  
+                clearLLMFields();  
+                clearFunctionFields();  
+            }  
+        }  
   
         function populateLLMDefaults() {  
             // Set default values for the evaluator  
@@ -198,44 +286,164 @@
   
             var defaultPromptTemplate = `Given the following text:\n\n"{{ '{{' }}output{{ '}}' }}"\n\nPlease rate the sentiment of this text as 'positive', 'neutral', or 'negative'.`;  
             document.getElementById('prompt_template').value = defaultPromptTemplate;  
-
+  
             var defaultChoiceScores = '{"positive": 1.0, "neutral": 0.5, "negative": 0.0}';  
             document.getElementById('choice_scores').value = defaultChoiceScores;  
   
             document.getElementById('use_cot').checked = false;  
-        } 
+        }  
   
-        function populateFunctionDefaults() {    
-            var functionSubtype = document.getElementById('function_subtype').value;    
+        function populateFunctionDefaults() {  
+            var functionSubtype = document.getElementById('function_subtype').value;  
   
-            if (functionSubtype === 'regex_match') {    
-                document.getElementById('name').value = 'Regex Match';    
+            if (functionSubtype === 'regex_match') {  
+                document.getElementById('name').value = 'Regex Match';  
   
-                // Provide a default regex pattern    
-                var defaultParameters = '{"pattern": "\\\\d+"}';    
-                document.getElementById('parameters').value = defaultParameters;    
+                // Provide a default regex pattern  
+                var defaultParameters = '{"pattern": "\\\\d+"}';  
+                document.getElementById('parameters').value = defaultParameters;  
   
-            } else {    
-                // Clear parameters if other subtype    
-                clearFunctionFields();    
-            }    
-        }    
+            } else {  
+                // Clear parameters if other subtype  
+                clearFunctionFields();  
+            }  
+        }  
   
-        function clearLLMFields() {    
-            document.getElementById('prompt_template').value = '';    
-            document.getElementById('choice_scores').value = '';    
-            document.getElementById('use_cot').checked = false;    
-            document.getElementById('model_deployment_name').value = '{{ default_deployment }}';    
-            document.getElementById('temperature').value = '0.0';    
-        }    
+        function clearLLMFields() {  
+            document.getElementById('prompt_template').value = '';  
+            document.getElementById('choice_scores').value = '';  
+            document.getElementById('use_cot').checked = false;  
+            document.getElementById('model_deployment_name').value = '{{ default_deployment }}';  
+            document.getElementById('temperature').value = '0.0';  
+        }  
   
-        function clearFunctionFields() {    
-            document.getElementById('function_subtype').value = '';    
-            document.getElementById('parameters').value = '';    
-        }    
+        function clearFunctionFields() {  
+            document.getElementById('function_subtype').value = '';  
+            document.getElementById('parameters').value = '';  
+        }  
   
-        // Initial call to set fields if the page is reloaded with existing values    
-        toggleEvaluatorFields();    
-    </script>    
-</body>    
-</html>    
+        // Wizard Navigation Functions  
+        function showTab(n) {  
+            var tabs = document.getElementsByClassName("tab");  
+            // Hide all tabs  
+            for (var i = 0; i < tabs.length; i++) {  
+                tabs[i].style.display = "none";  
+                tabs[i].classList.remove("fade-in-left", "fade-in-right", "fade-out-left", "fade-out-right");  
+            }  
+  
+            // Determine animation direction  
+            if (n > currentTab) {  
+                tabs[n].classList.add("fade-in-right");  
+            } else if (n < currentTab) {  
+                tabs[n].classList.add("fade-in-left");  
+            }  
+            tabs[n].style.display = "block";  
+  
+            // Update the "active" class on step indicators  
+            var steps = document.getElementsByClassName("step");  
+            for (var i = 0; i < steps.length; i++) {  
+                steps[i].classList.remove("active");  
+            }  
+            steps[n].classList.add("active");  
+  
+            currentTab = n;  
+            updateButtonVisibility();  
+            if (n == tabs.length - 1) {  
+                // If last tab, update the review  
+                updateReview();  
+            }  
+        }  
+  
+        function nextPrev(n) {  
+            var tabs = document.getElementsByClassName("tab");  
+            // Add exit animation to current tab  
+            if (n > 0) {  
+                tabs[currentTab].classList.add("fade-out-left");  
+            } else {  
+                tabs[currentTab].classList.add("fade-out-right");  
+            }  
+            setTimeout(function() {  
+                // Hide the current tab  
+                tabs[currentTab].style.display = "none";  
+                // Increase or decrease the current tab by n  
+                currentTab = currentTab + n;  
+                // Display the correct tab  
+                showTab(currentTab);  
+            }, 300); // Match this timeout with the animation duration  
+        }  
+  
+        function updateButtonVisibility() {  
+            var tabs = document.getElementsByClassName("tab");  
+            var prevBtn = document.getElementById("prevBtn");  
+            var nextBtn = document.getElementById("nextBtn");  
+            var submitBtn = document.getElementById("submitBtn");  
+  
+            if (currentTab == 0) {  
+                prevBtn.style.display = "none";  
+            } else {  
+                prevBtn.style.display = "inline";  
+            }  
+            if (currentTab == (tabs.length - 1)) {  
+                nextBtn.style.display = "none";  
+                submitBtn.style.display = "inline";  
+            } else {  
+                nextBtn.style.display = "inline";  
+                submitBtn.style.display = "none";  
+            }  
+        }  
+  
+        function updateReview() {  
+            // Update the review section with selected values  
+            var evaluatorType = document.getElementById('evaluator_type').value;  
+            document.getElementById('review_evaluator_type').innerText = evaluatorType || 'N/A';  
+            document.getElementById('review_name').innerText = document.getElementById('name').value || 'N/A';  
+  
+            if (evaluatorType === 'LLMClassifier') {  
+                document.getElementById('review_llm_fields').style.display = 'block';  
+                document.getElementById('review_function_fields').style.display = 'none';  
+  
+                document.getElementById('review_prompt_template').innerText = document.getElementById('prompt_template').value || 'N/A';  
+                document.getElementById('review_choice_scores').innerText = document.getElementById('choice_scores').value || 'N/A';  
+                document.getElementById('review_use_cot').innerText = document.getElementById('use_cot').checked ? 'Yes' : 'No';  
+                document.getElementById('review_model_deployment_name').innerText = document.getElementById('model_deployment_name').value || 'N/A';  
+                document.getElementById('review_temperature').innerText = document.getElementById('temperature').value || '0.0';  
+  
+            } else if (evaluatorType === 'FunctionEvaluator') {  
+                document.getElementById('review_llm_fields').style.display = 'none';  
+                document.getElementById('review_function_fields').style.display = 'block';  
+  
+                document.getElementById('review_function_subtype').innerText = document.getElementById('function_subtype').value || 'N/A';  
+                document.getElementById('review_parameters').innerText = document.getElementById('parameters').value || 'N/A';  
+  
+            } else {  
+                // Hide both review sections  
+                document.getElementById('review_llm_fields').style.display = 'none';  
+                document.getElementById('review_function_fields').style.display = 'none';  
+            }  
+        }  
+  
+        var currentTab = 0; // Current tab is set to be the first tab (0)  
+        document.addEventListener('DOMContentLoaded', function() {  
+            showTab(currentTab); // Display the current tab  
+            toggleEvaluatorFields(); // Initialize fields based on evaluator type  
+        });  
+  
+        // Functions to open and close the Evaluators Modal  
+        function openEvaluatorsModal() {  
+            document.getElementById('evaluatorsModal').style.display = 'block';  
+        }  
+  
+        function closeEvaluatorsModal() {  
+            document.getElementById('evaluatorsModal').style.display = 'none';  
+        }  
+  
+        // Close modal when clicking outside of it  
+        window.onclick = function(event) {  
+            var modal = document.getElementById('evaluatorsModal');  
+            if (event.target == modal) {  
+                closeEvaluatorsModal();  
+            }  
+        }  
+    </script>  
+</body>  
+</html>  

@@ -9,8 +9,11 @@ import re
 import decimal
 from typing import Optional
 from bson import ObjectId
-from pymongo import MongoClient
-from pymongo.errors import PyMongoError
+
+import pymongo  
+from pymongo import MongoClient  
+from pymongo.errors import PyMongoError, OperationFailure  
+from pymongo.operations import SearchIndexModel  
 from dotenv import load_dotenv
 from autoevals import Factuality, LLMClassifier, init  
 from autoevals.ragas import ContextRelevancy, Faithfulness  
