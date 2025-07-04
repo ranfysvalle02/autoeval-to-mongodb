@@ -8,28 +8,28 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>  
     <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">  
     <link href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Double:wght@100..900&display=swap" rel="stylesheet">  
-        
+          
     <!-- Include Font Awesome for Icons -->  
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>  
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>  
-        
+          
     <!-- Embedded JavaScript -->  
     <script>  
         function showLoading() {  
             document.getElementById('loadingModal').style.display = 'block';  
         }  
-        
+          
         function submitPreview(idx) {  
             // Open the modal and show loading indicator  
             openPreviewModal();  
-        
+          
             // Gather the form data  
             var formData = new FormData();  
             var testCaseCountInput = document.getElementsByName('test_case_count')[0];  
             var testCaseCount = testCaseCountInput.value;  
-        
+          
             formData.append('test_case_count', testCaseCount);  
-        
+          
             // Append deployment_names  
             var deploymentNameFields = document.getElementsByName('deployment_names');  
             for (var i = 0; i < deploymentNameFields.length; i++) {  
@@ -37,23 +37,23 @@
                     formData.append('deployment_names', deploymentNameFields[i].value);  
                 }  
             }  
-        
+          
             // Append idx_meta_id  
             var idxMetaId = document.getElementById('idx_meta_id').value;  
             formData.append('idx_meta_id', idxMetaId);  
-        
+          
             // Append response_criteria  
             var responseCriteriaField = document.getElementsByName('response_criteria')[0];  
             formData.append('response_criteria', responseCriteriaField.value);  
-        
+          
             // Append system_prompt_template  
             var systemPromptField = document.getElementsByName('system_prompt_template')[0];  
             formData.append('system_prompt_template', systemPromptField.value);  
-        
+          
             // Append user_prompt_template  
             var userPromptField = document.getElementsByName('user_prompt_template')[0];  
             formData.append('user_prompt_template', userPromptField.value);  
-        
+          
             // Append selected metrics  
             var metricCheckboxes = document.getElementsByName('metrics');  
             for (var i = 0; i < metricCheckboxes.length; i++) {  
@@ -61,16 +61,16 @@
                     formData.append('metrics', metricCheckboxes[i].value);  
                 }  
             }  
-        
+          
             // Append the specific test case input and expected output  
             var inputPromptField = document.getElementsByName('input_prompt_' + idx)[0];  
             var expectedOutputField = document.getElementsByName('expected_output_' + idx)[0];  
             formData.append('input_prompt_' + idx, inputPromptField.value);  
             formData.append('expected_output_' + idx, expectedOutputField.value);  
-        
+          
             // Add test_case_idx  
             formData.append('test_case_idx', idx);  
-        
+          
             // Append selected fields  
             var fieldCheckboxes = document.getElementsByName('fields');  
             for (var i = 0; i < fieldCheckboxes.length; i++) {  
@@ -78,7 +78,7 @@
                     formData.append('fields', fieldCheckboxes[i].value);  
                 }  
             }  
-        
+          
             // Send all input_prompts and expected_outputs  
             var totalTestCases = parseInt(testCaseCount);  
             for (var i = 0; i < totalTestCases; i++) {  
@@ -87,12 +87,12 @@
                 formData.append('input_prompt_' + i, inputPromptFieldAll.value);  
                 formData.append('expected_output_' + i, expectedOutputFieldAll.value);  
             }  
-        
+          
             // Make an AJAX request to /preview  
             var xhr = new XMLHttpRequest();  
             xhr.open('POST', '/preview', true);  
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');  
-        
+          
             xhr.onload = function() {  
                 if (xhr.status === 200) {  
                     // Display the preview content in the modal  
@@ -103,25 +103,25 @@
                     document.getElementById('previewContent').innerHTML = '<p class="error">An error occurred while fetching the preview.</p>';  
                 }  
             };  
-        
+          
             xhr.onerror = function() {  
                 document.getElementById('previewContent').innerHTML = '<p class="error">An error occurred while fetching the preview.</p>';  
             };  
-        
+          
             xhr.send(formData);  
         }  
-        
+          
         function openPreviewModal() {  
             document.getElementById('previewModal').style.display = 'block';  
             // Show loading indicator  
             document.getElementById('previewContent').innerHTML = '<div class="spinner"><div class="bounce1"></div><div class="bounce2"></div></div><p style="text-align:center;">Loading preview...</p>';  
         }  
-        
+          
         function closePreviewModal() {  
             document.getElementById('previewModal').style.display = 'none';  
             document.getElementById('previewContent').innerHTML = '';  
         }  
-        
+          
         function removeTestCase(testCaseId) {  
             var confirmation = confirm("Are you sure you want to remove this test case?");  
             if (confirmation) {  
@@ -131,34 +131,34 @@
                 form.submit();  
             }  
         }  
-        
+          
         function openAddTestCaseModal() {  
             document.getElementById('addTestCaseModal').style.display = 'block';  
         }  
-        
+          
         function closeAddTestCaseModal() {  
             document.getElementById('addTestCaseModal').style.display = 'none';  
             clearAddTestCaseForm();  
         }  
-        
+          
         function clearAddTestCaseForm() {  
             document.getElementById('new_input_prompt').value = '';  
             document.getElementById('new_expected_output').value = '';  
             document.getElementById('addTestCaseError').innerText = '';  
         }  
-        
+          
         function validateAddTestCaseForm() {  
             var inputPrompt = document.getElementById('new_input_prompt').value.trim();  
             var errorElement = document.getElementById('addTestCaseError');  
-        
+          
             if (inputPrompt === '') {  
                 errorElement.innerText = 'Input Prompt is required.';  
                 return false;  
             }  
-        
+          
             return true;  
         }  
-        
+          
         // Function to initialize collapsible elements  
         function initializeCollapsibles() {  
             var coll = document.getElementById('previewContent').getElementsByClassName("collapsible");  
@@ -179,7 +179,7 @@
                 });  
             }  
         }  
-        
+          
         // Close modal when clicking outside of it  
         window.onclick = function(event) {  
             var modal = document.getElementById('addTestCaseModal');  
@@ -195,16 +195,16 @@
                 // Do nothing to prevent closing the loading modal when clicking outside  
             }  
         };  
-        
+          
         // Function to load fields and test cases based on selected index configuration  
         function loadFieldsAndTestCases() {  
             var idxMetaId = document.getElementById('idx_meta_id').value;  
             var fieldsContainer = document.getElementById('fields_container');  
             var testCasesTableBody = document.getElementById('test_cases_table').getElementsByTagName('tbody')[0];  
-        
+          
             fieldsContainer.innerHTML = ''; // Clear previous fields  
             testCasesTableBody.innerHTML = ''; // Clear previous test cases  
-        
+          
             if (idxMetaId !== '') {  
                 var xhr = new XMLHttpRequest();  
                 xhr.open('POST', '/get_fields', true);  
@@ -235,12 +235,12 @@
                             var testDataset = data.test_dataset;  
                             testDataset.forEach(function(testCase, index) {  
                                 var tr = document.createElement('tr');  
-        
+          
                                 // ID Column  
                                 var tdId = document.createElement('td');  
                                 tdId.textContent = testCase.id;  
                                 tr.appendChild(tdId);  
-        
+          
                                 // Input Prompt Column  
                                 var tdInput = document.createElement('td');  
                                 var inputInputPrompt = document.createElement('input');  
@@ -249,7 +249,7 @@
                                 inputInputPrompt.value = testCase.input;  
                                 tdInput.appendChild(inputInputPrompt);  
                                 tr.appendChild(tdInput);  
-        
+          
                                 // Expected Output Column  
                                 var tdExpected = document.createElement('td');  
                                 var inputExpectedOutput = document.createElement('input');  
@@ -258,7 +258,7 @@
                                 inputExpectedOutput.value = testCase.expected || '';  
                                 tdExpected.appendChild(inputExpectedOutput);  
                                 tr.appendChild(tdExpected);  
-        
+          
                                 // Actions Column  
                                 var tdActions = document.createElement('td');  
                                 var previewButton = document.createElement('button');  
@@ -272,7 +272,7 @@
                                     };  
                                 })(index);  
                                 tdActions.appendChild(previewButton);  
-        
+          
                                 var removeButton = document.createElement('button');  
                                 removeButton.type = 'button';  
                                 removeButton.className = 'btn icon danger';  
@@ -284,9 +284,9 @@
                                     };  
                                 })(testCase.id);  
                                 tdActions.appendChild(removeButton);  
-        
+          
                                 tr.appendChild(tdActions);  
-        
+          
                                 testCasesTableBody.appendChild(tr);  
                             });  
                             // Update the test_case_count hidden input  
@@ -312,7 +312,7 @@
                 document.getElementsByName('test_case_count')[0].value = 0;  
             }  
         }  
-        
+          
         // Load previous runs via AJAX  
         function loadPreviousRuns() {  
             var xhr = new XMLHttpRequest();  
@@ -326,13 +326,13 @@
                     if (previousRuns && previousRuns.length > 0) {  
                         previousRuns.forEach(function(run) {  
                             var tr = document.createElement('tr');  
-        
+          
                             // Timestamp Column  
                             var tdTimestamp = document.createElement('td');  
                             var timestamp = new Date(run.timestamp);  
                             tdTimestamp.textContent = timestamp.toLocaleString();  
                             tr.appendChild(tdTimestamp);  
-        
+          
                             // Deployment Names Column  
                             var tdDeployment = document.createElement('td');  
                             if (run.deployment_names) {  
@@ -343,7 +343,16 @@
                                 tdDeployment.textContent = 'N/A';  
                             }  
                             tr.appendChild(tdDeployment);  
-        
+          
+                            // Embedding Model Column  
+                            var tdEmbeddingModel = document.createElement('td');  
+                            if (run.embedding_model_name) {  
+                                tdEmbeddingModel.textContent = run.embedding_model_name;  
+                            } else {  
+                                tdEmbeddingModel.textContent = 'N/A';  
+                            }  
+                            tr.appendChild(tdEmbeddingModel);  
+          
                             // Average Scores Column  
                             var tdScores = document.createElement('td');  
                             var averageScoresText = '';  
@@ -370,7 +379,7 @@
                             }  
                             tdScores.innerHTML = averageScoresText;  
                             tr.appendChild(tdScores);  
-        
+          
                             // Actions Column  
                             var tdActions = document.createElement('td');  
                             var viewButton = document.createElement('a');  
@@ -380,11 +389,11 @@
                             viewButton.innerHTML = '<i class="fa fa-file-alt"></i>';  
                             tdActions.appendChild(viewButton);  
                             tr.appendChild(tdActions);  
-        
+          
                             previousRunsTableBody.appendChild(tr);  
                         });  
                     } else {  
-                        previousRunsTableBody.innerHTML = '<tr><td colspan="4">No previous runs available.</td></tr>';  
+                        previousRunsTableBody.innerHTML = '<tr><td colspan="5">No previous runs available.</td></tr>';  
                     }  
                 } else {  
                     console.error('Failed to load previous runs.');  
@@ -395,7 +404,7 @@
             };  
             xhr.send();  
         }  
-        
+          
         // Wizard Navigation Functions  
         function showTab(n) {  
             var tabs = document.getElementsByClassName("tab");  
@@ -417,11 +426,11 @@
                 steps[i].classList.remove("active");  
             }  
             steps[n].classList.add("active");  
-        
+          
             currentTab = n;  
             updateButtonVisibility();  
         }  
-        
+          
         function nextPrev(n) {  
             var tabs = document.getElementsByClassName("tab");  
             // Add exit animation to current tab  
@@ -439,13 +448,13 @@
                 showTab(currentTab);  
             }, 300); // Match this timeout with the animation duration  
         }  
-        
+          
         function updateButtonVisibility() {  
             var tabs = document.getElementsByClassName("tab");  
             var prevBtn = document.getElementById("prevBtn");  
             var nextBtn = document.getElementById("nextBtn");  
             var submitBtn = document.getElementById("submitBtn");  
-        
+          
             if (currentTab == 0) {  
                 prevBtn.style.display = "none";  
             } else {  
@@ -459,7 +468,7 @@
                 submitBtn.style.display = "none";  
             }  
         }  
-        
+          
         var currentTab = 0; // Current tab is set to be the first tab (0)  
         document.addEventListener('DOMContentLoaded', function() {  
             showTab(currentTab); // Display the current tab  
@@ -474,7 +483,7 @@
             // Load previous runs via AJAX  
             loadPreviousRuns();  
         });  
-        
+          
     </script>  
 </head>  
 <body>  
@@ -491,7 +500,7 @@
             </div>  
         </div>  
     </header>  
-        
+          
     <!-- Wizard Navigation Buttons -->  
     <div class="wizard-navigation">  
         <button type="button" id="prevBtn" onclick="nextPrev(-1)" class="btn"><i class="fa fa-arrow-left"></i> Previous</button>  
@@ -499,7 +508,7 @@
         <!-- Submit Button -->  
         <button type="submit" id="submitBtn" class="btn primary" form="test_dataset_form" onclick="showLoading()" style="display: none;"><i class="fa fa-play"></i> Run Test on Test Dataset</button>  
     </div>  
-        
+          
     <!-- Wizard Step Indicators -->  
     <div class="step-indicators">  
         <span class="step active">1. Select Deployment</span>  
@@ -508,9 +517,9 @@
         <span class="step">4. Manage Test Cases</span>  
         <span class="step">5. Review & Run</span>  
     </div>  
-        
+          
     <main>  
-        
+          
         <!-- Modal for adding a new test case -->  
         <div id="addTestCaseModal" class="modal">  
             <div class="modal-content">  
@@ -533,7 +542,7 @@
                 </form>  
             </div>  
         </div>  
-        
+          
         <!-- Modal for previewing a test case -->  
         <div id="previewModal" class="modal">  
             <div class="modal-content">  
@@ -547,16 +556,16 @@
                 </div>  
             </div>  
         </div>  
-        
+          
         <!-- Form for removing a test case -->  
         <form id="remove_test_case_form" method="post" action="/remove_test_case" style="display: none;">  
             <input type="hidden" name="test_case_id_to_remove" id="test_case_id_to_remove">  
         </form>  
-        
+          
         <!-- Wizard Form -->  
         <section class="test-dataset">  
             <h2>Test Dataset Evaluation</h2>  
-        
+          
             <form id="test_dataset_form" method="post" action="/run_test">  
                 <!-- Tab 1: Deployment Selection -->  
                 <div class="tab">  
@@ -585,7 +594,7 @@
                         </select>  
                     </div>  
                 </div>  
-        
+          
                 <!-- Tab 2: Prompt Templates -->  
                 <div class="tab">  
                     <!-- System Prompt Template Input -->  
@@ -599,7 +608,7 @@
                         <textarea name="user_prompt_template" rows="6">{{ default_user_prompt }}</textarea>  
                     </div>  
                 </div>  
-        
+          
                 <!-- Tab 3: Metrics Selection -->  
                 <div class="tab">  
                     <!-- Response Criteria Input -->  
@@ -620,7 +629,7 @@
                         </div>  
                     </div>  
                 </div>  
-        
+          
                 <!-- Tab 4: Fields and Test Cases -->  
                 <div class="tab">  
                     <!-- Fields Selection -->  
@@ -650,7 +659,7 @@
                     </div>  
                     <button type="button" class="btn primary" onclick="openAddTestCaseModal()"><i class="fa fa-plus"></i> Add New Test Case</button>  
                 </div>  
-        
+          
                 <!-- Tab 5: Review & Run -->  
                 <div class="tab">  
                     <h3>Review Your Configuration</h3>  
@@ -658,13 +667,13 @@
                     <!-- For simplicity, we'll proceed directly to running the test -->  
                     <p>You're all set! Click "Run Test on Test Dataset" to proceed.</p>  
                 </div>  
-        
+          
                 <!-- Hidden input for test case count -->  
                 <input type="hidden" name="test_case_count" value="0">  
-        
+          
             </form>  
         </section>  
-        
+          
         <!-- Previous Test Runs Section -->  
         <section class="previous-runs">  
             <h2>Previous Test Runs</h2>  
@@ -674,18 +683,19 @@
                         <tr>  
                             <th>Timestamp</th>  
                             <th>Deployment Names</th>  
+                            <th>Embedding Model</th>  
                             <th>Average Scores</th>  
                             <th>Actions</th>  
                         </tr>  
                     </thead>  
                     <tbody id="previous_runs_table_body">  
                         <!-- Previous runs will be populated via JavaScript -->  
-                        <tr><td colspan="4">Loading previous runs...</td></tr>  
+                        <tr><td colspan="5">Loading previous runs...</td></tr>  
                     </tbody>  
                 </table>  
             </div>  
         </section>  
-        
+          
         <!-- Loading Indicator for Running Test -->  
         <div id="loadingModal" class="modal">  
             <div class="modal-content loading-modal-content">  
@@ -702,9 +712,9 @@
             </div>  
         </div>  
     </main>  
-        
+          
     <footer>  
-    
+      
     </footer>  
 </body>  
 </html>  
