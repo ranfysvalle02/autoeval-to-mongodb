@@ -91,3 +91,62 @@ This command uses the `mongorestore` tool to unpack the downloaded archive (`sam
 
 ----
 
+## Unleash the Full Potential of Your RAG App
+
+Building powerful Retrieval-Augmented Generation (RAG) applications is revolutionizing how we interact with information. But the real challenge isn't just *building* them; it's **knowing if they're actually performing well**. Are they retrieving the right information? Are the responses accurate and relevant? Are they meeting your specific business needs?
+
+Enter **MDBEvalHub**, the groundbreaking new tool designed to be your ultimate RAG evaluation companion for applications powered by MongoDB Atlas. MDBEvalHub isn't just about running tests; it's about providing the insights and control you need to build truly exceptional RAG experiences.
+
+---
+
+### Why MDBEvalHub
+
+#### 1. Instant Index Creation + Synthetic Data & Q&A Generation
+
+Forget manual setup. MDBEvalHub doesn't just help you evaluate; it helps you **prepare your data for evaluation**.
+* **Seamless Atlas Search Indexing:** Create fully functional Atlas Search indexes directly from your MongoDB collections. Specify source databases, collections, and even apply `$match` stages for precise data selection.
+* **Effortless Data Preparation:** The magic doesn't stop there. MDBEvalHub can **automatically generate sample data and synthetic question-and-answer (Q&A) pairs** based on your chosen context. This is a massive time-saver, letting you build a robust test dataset even without pre-existing ground truth. Get started evaluating in minutes, not hours!
+
+#### 2. Truly Custom Evaluators: Measure What *Matters to You*
+
+Generic metrics are a start, but your RAG application has unique requirements. MDBEvalHub understands this.
+* **Beyond the Standard:** While MDBEvalHub includes powerful built-in metrics like **Factuality, Context Relevancy, and Faithfulness**, its real power lies in **custom evaluators**.
+* **LLMClassifiers & FunctionEvaluators:** Want to assess sentiment? Check for specific keywords with a regex? Ensure legal compliance? MDBEvalHub lets you define **LLM-powered classifiers** and **function-based evaluators** (like a regex matcher). This means your evaluation directly reflects your application's specific goals.
+
+#### 3. See Before You Leap: Powerful Preview Functionality
+
+No more guessing games. Iteration is key, and MDBEvalHub makes it incredibly efficient.
+* **Single Test Case Insights:** Before running a full battery of tests, use the **preview feature** to evaluate a single input prompt.
+* **Holistic Feedback:** Get instant feedback on the generated output, the specific context retrieved, and the scores from *all* selected metrics (including your custom ones). This allows for rapid iteration and fine-tuning of your prompts and RAG configuration.
+
+#### 4. Comprehensive Test Runs & Actionable Results
+
+When you're ready, MDBEvalHub delivers the full picture.
+* **Multi-Deployment Evaluation:** Compare the performance of different RAG deployments side-by-side. Understand which models and configurations perform best for your use case.
+* **Rich Reporting:** Post-run, receive detailed reports that go beyond just a score. Access:
+    * **Average scores** for all metrics.
+    * **Individual test case breakdowns**, including the original input, generated output, expected output (if provided), and the specific context used.
+    * **LLM messages** for deeper debugging.
+    * **Total duration** for performance insights.
+    * This granular data allows you to pinpoint weaknesses and optimize precisely.
+
+#### 5. Intuitive Wizard-Based Experience
+
+From novice to expert, MDBEvalHub's design makes evaluation straightforward.
+* **Step-by-Step Guidance:** A clear, **wizard-based interface** guides you through every stage: deployment selection, prompt engineering, metric selection, and test case management.
+* **User-Friendly Design:** Spend less time learning the tool and more time improving your RAG applications.
+
+---
+
+### Transform Your RAG Development Workflow
+
+MDBEvalHub isn't just an evaluation tool; it's a paradigm shift for RAG development on MongoDB Atlas. By bringing together intelligent data preparation, flexible custom evaluation, and insightful reporting in an intuitive package, it empowers developers to:
+
+* **Accelerate Iteration:** Rapidly test and refine RAG configurations.
+* **Improve Accuracy:** Ensure your RAG applications deliver precise and relevant answers.
+* **Boost Confidence:** Validate performance against real-world and custom criteria.
+* **Save Time & Resources:** Automate complex evaluation tasks and gain immediate insights.
+
+If you're building RAG applications with MongoDB Atlas and want to move from guesswork to confident, data-driven optimization, **MDBEvalHub is the tool you've been waiting for.**
+
+**Ready to see your RAG applications reach their full potential? Explore MDBEvalHub today!**
