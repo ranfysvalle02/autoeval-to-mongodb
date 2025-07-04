@@ -18,12 +18,12 @@ import decimal
 import logging  
 from autoevals import Factuality, LLMClassifier, init  
 from autoevals.ragas import ContextRelevancy, Faithfulness  
-
-import mdb_autoevals  # Import the MDBAutoEval class from mdb_autoevals.py
-
+  
+import mdb_autoevals  # Import the MDBAutoEval class from mdb_autoevals.py  
+  
 # Create an instance of MDBAutoEval  
 autoeval = mdb_autoevals.MDBAutoEval()  
-
+  
 SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key")  
 app = Flask(__name__)  
 app.secret_key = SECRET_KEY  
@@ -32,26 +32,6 @@ app.secret_key = SECRET_KEY
   
 @app.route('/', methods=['GET'])  
 def index():  
-    # Fetch previous test runs from MongoDB  
-    previous_runs = list(  
-        autoeval.test_runs_collection.find(  
-            {},  
-            {  
-                "timestamp": 1,  
-                "deployment_names": 1,  
-                "deployment_name": 1,  # Include for older test runs  
-                "models": 1,  # Include models to access durations  
-                "average_scores": 1,  
-                "response_criteria": 1,  
-                "system_prompt_template": 1,  
-                "user_prompt_template": 1,  
-                "test_cases.input_prompt": 1,  
-                "selected_metrics": 1,  
-                "total_duration_seconds": 1,  # Include the total duration  
-            }  
-        ).sort("timestamp", -1).limit(10)  
-    )  # Get last 10 runs  
-  
     # Fetch idx_meta entries  
     try:  
         idx_meta_entries = list(autoeval.idx_meta_collection.find({}))  
@@ -72,15 +52,6 @@ def index():
             session['idx_meta_id'] = idx_meta_id  
         else:  
             idx_meta_id = None  
-  
-    if idx_meta_id:  
-        selected_idx_meta = autoeval.idx_meta_collection.find_one({'_id': ObjectId(idx_meta_id)})  
-        if selected_idx_meta and 'test_dataset' in selected_idx_meta:  
-            test_dataset = selected_idx_meta['test_dataset']  
-        else:  
-            test_dataset = []  
-    else:  
-        test_dataset = []  
   
     default_response_criteria = """  
 - Provide a concise answer to the question based ONLY on the context.  
@@ -115,10 +86,8 @@ Below is the context, which includes plots of movies.
   
     return render_template(  
         'index.html',  
-        test_dataset=test_dataset,  
         deployment_names=autoeval.DEPLOYMENT_NAMES,  
         default_deployment=autoeval.DEFAULT_DEPLOYMENT_NAME,  
-        previous_runs=previous_runs,  
         default_response_criteria=default_response_criteria,  
         default_system_prompt=default_system_prompt,  
         default_user_prompt=default_user_prompt,  
@@ -152,6 +121,63 @@ def get_fields_route():
     else:  
         # If idx_meta_id is not provided, handle accordingly  
         return jsonify({'fields': [], 'test_dataset': []})  
+  
+@app.route('/get_collection_fields', methods=['POST'])  
+def get_collection_fields_route():  
+    db_name = request.form.get('db_name')  
+    collection_name = request.form.get('collection_name')  
+    fields = autoeval.get_collection_fields(db_name, collection_name)  
+    # Return fields as a list  
+    return jsonify({'fields': fields})  
+  
+@app.route('/get_test_dataset', methods=['POST'])  
+def get_test_dataset():  
+    idx_meta_id = request.form.get('idx_meta_id')  
+    if idx_meta_id:  
+        try:  
+            idx_meta = autoeval.idx_meta_collection.find_one({'_id': ObjectId(idx_meta_id)})  
+            if idx_meta and 'test_dataset' in idx_meta:  
+                test_dataset = idx_meta['test_dataset']  
+            else:  
+                test_dataset = []  
+            return jsonify({'test_dataset': test_dataset})  
+        except Exception as e:  
+            autoeval.logger.error(f"Error fetching test dataset by idx_meta_id: {e}")  
+            return jsonify({'test_dataset': []})  
+    else:  
+        return jsonify({'test_dataset': []})  
+  
+@app.route('/get_previous_runs', methods=['GET'])  
+def get_previous_runs():  
+    previous_runs = list(  
+        autoeval.test_runs_collection.find(  
+            {},  
+            {  
+                "timestamp": 1,  
+                "deployment_names": 1,  
+                "deployment_name": 1,  # Include for older test runs  
+                "models": 1,  # Include models to access durations  
+                "average_scores": 1,  
+                "response_criteria": 1,  
+                "system_prompt_template": 1,  
+                "user_prompt_template": 1,  
+                "test_cases.input_prompt": 1,  
+                "selected_metrics": 1,  
+                "total_duration_seconds": 1,  # Include the total duration  
+            }  
+        ).sort("timestamp", -1).limit(10)  
+    )  
+  
+    # Convert ObjectId to string and timestamp to string  
+    for run in previous_runs:  
+        run['_id'] = str(run['_id'])  
+        if 'timestamp' in run:  
+            if isinstance(run['timestamp'], datetime.datetime):  
+                run['timestamp'] = run['timestamp'].isoformat()  
+            else:  
+                run['timestamp'] = str(run['timestamp'])  
+  
+    return jsonify({'previous_runs': previous_runs})  
   
 @app.route('/get_collections', methods=['POST'])  
 def get_collections_route():  
@@ -324,7 +350,6 @@ def run_test():
   
     return render_template('test_results.html', test_run=test_run_data, current_year=datetime.datetime.utcnow().year)  
   
-  
 @app.route('/test_run/<string:run_id>', methods=['GET'])  
 def view_test_run(run_id):  
     # Retrieve test run data from MongoDB using the run_id  
@@ -420,46 +445,36 @@ def list_indexes():
                                 autoeval.logger.info(f"Index '{index_name}' created successfully for model '{model_name}'.")  
   
                                 # Collect context from a sample of documents to use for test dataset generation  
-                                # --- Aggregation Magic ---
-
-                                # First, get a sample document to identify all potential fields.
-                                # In a production environment, you might have a more robust schema discovery mechanism
-                                # or rely on predefined schema knowledge.
-                                
-                                sample_doc = autoeval.mongo_client[destination_db_name][destination_collection_name].find_one({})
-                                all_fields = list(sample_doc.keys()) if sample_doc else []
-
-                                # Build the dynamic $project stage
-                                project_stage_fields = {"_id": 0} # Exclude _id by default
-
-                                for field in all_fields:
-                                    # If the field is the source_field, we still want to project it as is,
-                                    # assuming it's not an array that needs to be removed from the final extraction.
-                                    # If source_field could be an array that you want to exclude from the context_list,
-                                    # the condition below would handle it.
-                                    project_stage_fields[field] = {
-                                        "$cond": {
-                                            "if": {"$eq": [{"$type": f"${field}"}, "array"]},
-                                            "then": "$$REMOVE",  # Exclude if it's an array
-                                            "else": f"${field}" # Include otherwise
-                                        }
-                                    }
-
-                                pipeline = [
-                                    {"$project": project_stage_fields},
-                                    {"$limit": 5} # Apply limit after projection
-                                ]
-
-                                sample_docs_cursor = autoeval.mongo_client[destination_db_name][destination_collection_name].aggregate(pipeline)
-
-                                context_list = []
-                                for doc in sample_docs_cursor:
-                                    # Use autoeval.get_value_from_field on the *processed* document
-                                    text = autoeval.get_value_from_field(doc, source_field)
-                                    if text:
-                                        context_list.append(text)
-
-                                context_str = "\n".join(context_list)
+                                sample_doc = autoeval.mongo_client[destination_db_name][destination_collection_name].find_one({})  
+                                all_fields = list(sample_doc.keys()) if sample_doc else []  
+  
+                                # Build the dynamic $project stage  
+                                project_stage_fields = {"_id": 0}  # Exclude _id by default  
+  
+                                for field in all_fields:  
+                                    project_stage_fields[field] = {  
+                                        "$cond": {  
+                                            "if": {"$eq": [{"$type": f"${field}"}, "array"]},  
+                                            "then": "$$REMOVE",  # Exclude if it's an array  
+                                            "else": f"${field}"  # Include otherwise  
+                                        }  
+                                    }  
+  
+                                pipeline = [  
+                                    {"$project": project_stage_fields},  
+                                    {"$limit": 5}  # Apply limit after projection  
+                                ]  
+  
+                                sample_docs_cursor = autoeval.mongo_client[destination_db_name][destination_collection_name].aggregate(pipeline)  
+  
+                                context_list = []  
+                                for doc in sample_docs_cursor:  
+                                    # Use autoeval.get_value_from_field on the *processed* document  
+                                    text = autoeval.get_value_from_field(doc, source_field)  
+                                    if text:  
+                                        context_list.append(text)  
+  
+                                context_str = "\n".join(context_list)  
   
                                 # Generate Q&A pairs from the context  
                                 test_dataset_qa_pairs = autoeval.generate_qa_from_context(context_str, max_questions=5)  
@@ -505,42 +520,18 @@ def list_indexes():
                     except Exception as e:  
                         error_message = f"An error occurred: {e}"  
   
-    # Fetch databases and their collections and indexes  
-    databases_info = []  
-    mdb_autoevals_db_name = 'mdb_autoevals'  
-    try:  
-        mdb_autoevals_db = autoeval.mongo_client[mdb_autoevals_db_name]  
-        collections = mdb_autoevals_db.list_collection_names()  
-        db_info = {  
-            'name': mdb_autoevals_db_name,  
-            'collections': []  
-        }  
-        for collection_name in collections:  
-            fields = autoeval.get_collection_fields(mdb_autoevals_db_name, collection_name)  
-            indexes = autoeval.get_atlas_search_indexes(mdb_autoevals_db_name, collection_name)  
-            collection_info = {  
-                'name': collection_name,  
-                'fields': fields,  
-                'indexes': indexes  
-            }  
-            db_info['collections'].append(collection_info)  
-        databases_info.append(db_info)  
-    except Exception as e:  
-        error_message = f"Error fetching collections: {e}"  
-  
-    # Now, we also need the list of source databases for the form  
+    # Fetch the list of source databases for the form  
     source_databases_info = autoeval.get_databases()  
   
     current_year = datetime.datetime.utcnow().year  
   
     return render_template(  
         'list_indexes.html',  
-        databases=databases_info,  
-        source_databases=source_databases_info,  
         current_year=current_year,  
         error_message=error_message,  
         success_message=success_message,  
-        embedding_models=autoeval.EMBEDDING_MODELS  # Pass embedding models to template  
+        embedding_models=autoeval.EMBEDDING_MODELS,  # Pass embedding models to template  
+        source_databases=source_databases_info  # Pass source databases to template  
     )  
   
 @app.route('/manage_evaluators', methods=['GET', 'POST'])  
@@ -770,23 +761,23 @@ def preview():
                         result = evaluator.eval(  
                             input=input_prompt,  
                             output=generated_output,  
-                            expected=expected_output  ,
-                            context=context_str,
-                            response_criteria=response_criteria
+                            expected=expected_output,  
+                            context=context_str,  
+                            response_criteria=response_criteria  
                         )  
                 elif isinstance(evaluator, LLMClassifier):  
                     result = evaluator.eval(  
                         output=generated_output,  
-                        input=input_prompt,
-                        context=context_str,
-                        response_criteria=response_criteria
+                        input=input_prompt,  
+                        context=context_str,  
+                        response_criteria=response_criteria  
                     )  
                 elif isinstance(evaluator, (ContextRelevancy, Faithfulness)):  
                     result = evaluator.eval(  
                         input=input_prompt,  
                         output=generated_output,  
-                        context=context_str,
-                        response_criteria=response_criteria
+                        context=context_str,  
+                        response_criteria=response_criteria  
                     )  
                 else:  
                     autoeval.logger.error(f"Evaluator of type {type(evaluator)} for metric {metric_name} is not recognized.")  

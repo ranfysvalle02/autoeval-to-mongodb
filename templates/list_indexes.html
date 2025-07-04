@@ -11,6 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Double:wght@100..900&display=swap" rel="stylesheet">  
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>  
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"/>  
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>  
 </head>  
 <body>  
     <header>  
@@ -21,7 +22,7 @@
                 <h1>MDBEvalHub: Create New Index</h1>  
             </div>  
             <div class="header-buttons">  
-                <a href="/" class="btn header-btn">Back to Home</a>  
+                <a href="{{ url_for('index') }}" class="btn header-btn">Back to Home</a>  
             </div>  
         </div>  
     </header>  
@@ -44,13 +45,6 @@
     </div>  
   
     <main>  
-        {% if error_message %}  
-            <p class="error">{{ error_message }}</p>  
-        {% endif %}  
-        {% if success_message %}  
-            <p class="success">{{ success_message }}</p>  
-        {% endif %}  
-  
         <!-- Wizard Form -->  
         <section>  
             <form id="create_index_form" method="post" action="{{ url_for('list_indexes') }}">  
@@ -141,6 +135,17 @@
         </section>  
     </main>  
   
+    <!-- Success Modal -->  
+    <div id="successModal" class="modal">  
+        <div class="modal-content">  
+            <h2>Index Created Successfully</h2>  
+            <p>Your index has been created successfully. You will be redirected to the home page in <span id="redirectTimer">5</span> seconds.</p>  
+            <div class="form-actions">  
+                <button type="button" class="btn primary" onclick="redirectToHome()">Go to Home Now</button>  
+            </div>  
+        </div>  
+    </div>  
+  
     <!-- Loading Indicator for Creating Index -->  
     <div id="loadingModal" class="modal">  
         <div class="modal-content loading-modal-content">  
@@ -159,7 +164,7 @@
   
     <!-- Fixed Bottom Navigation -->  
     <div class="bottom-nav">  
-        
+          
     </div>  
   
     <footer>  
@@ -173,27 +178,9 @@
             document.getElementById('loadingModal').style.display = 'block';  
         }  
   
-        // Create a mapping of databases to their collections  
-        var dbCollections = {};  
-        {% for db in source_databases %}  
-            dbCollections["{{ db.name }}"] = [  
-                {% for collection in db.collections %}  
-                    "{{ collection.name }}"{% if not loop.last %},{% endif %}  
-                {% endfor %}  
-            ];  
-        {% endfor %}  
-  
-        // Create a mapping of collections to their fields  
-        var collectionFields = {};  
-        {% for db in source_databases %}  
-            {% for collection in db.collections %}  
-                collectionFields["{{ db.name }}.{{ collection.name }}"] = [  
-                    {% for field in collection.fields %}  
-                        "{{ field }}"{% if not loop.last %},{% endif %}  
-                    {% endfor %}  
-                ];  
-            {% endfor %}  
-        {% endfor %}  
+        function redirectToHome() {  
+            window.location.href = "{{ url_for('index') }}";  
+        }  
   
         // JavaScript to populate collections based on selected database  
         document.getElementById('db_name').addEventListener('change', function() {  
@@ -206,13 +193,28 @@
             sourceFieldSelect.innerHTML = '<option value="">-- Select Source Field --</option>';  
   
             if (dbName !== '') {  
-                var collections = dbCollections[dbName] || [];  
-                collections.forEach(function(collectionName) {  
-                    var option = document.createElement('option');  
-                    option.value = collectionName;  
-                    option.text = collectionName;  
-                    collectionSelect.add(option);  
-                });  
+                // Fetch collections via AJAX  
+                var xhr = new XMLHttpRequest();  
+                xhr.open('POST', '/get_collections', true);  
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');  
+                xhr.onload = function() {  
+                    if (xhr.status === 200) {  
+                        var data = JSON.parse(xhr.responseText);  
+                        var collections = data.collections || [];  
+                        collections.forEach(function(collection) {  
+                            var option = document.createElement('option');  
+                            option.value = collection.name;  
+                            option.text = collection.name;  
+                            collectionSelect.add(option);  
+                        });  
+                    } else {  
+                        console.error('Failed to load collections.');  
+                    }  
+                };  
+                xhr.onerror = function() {  
+                    console.error('Failed to load collections.');  
+                };  
+                xhr.send('db_name=' + encodeURIComponent(dbName));  
             }  
         });  
   
@@ -226,14 +228,28 @@
             sourceFieldSelect.innerHTML = '<option value="">-- Select Source Field --</option>';  
   
             if (dbName !== '' && collectionName !== '') {  
-                var key = dbName + '.' + collectionName;  
-                var fields = collectionFields[key] || [];  
-                fields.forEach(function(fieldName) {  
-                    var option = document.createElement('option');  
-                    option.value = fieldName;  
-                    option.text = fieldName;  
-                    sourceFieldSelect.add(option);  
-                });  
+                // Fetch fields via AJAX  
+                var xhr = new XMLHttpRequest();  
+                xhr.open('POST', '/get_collection_fields', true);  
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');  
+                xhr.onload = function() {  
+                    if (xhr.status === 200) {  
+                        var data = JSON.parse(xhr.responseText);  
+                        var fields = data.fields || [];  
+                        fields.forEach(function(fieldName) {  
+                            var option = document.createElement('option');  
+                            option.value = fieldName;  
+                            option.text = fieldName;  
+                            sourceFieldSelect.add(option);  
+                        });  
+                    } else {  
+                        console.error('Failed to load fields.');  
+                    }  
+                };  
+                xhr.onerror = function() {  
+                    console.error('Failed to load fields.');  
+                };  
+                xhr.send('db_name=' + encodeURIComponent(dbName) + '&collection_name=' + encodeURIComponent(collectionName));  
             }  
         });  
   
@@ -330,6 +346,20 @@
         var currentTab = 0; // Current tab is set to be the first tab (0)  
         document.addEventListener('DOMContentLoaded', function() {  
             showTab(currentTab); // Display the current tab  
+  
+            {% if success_message %}  
+                // If success_message is set, show the success modal and redirect after a delay  
+                document.getElementById('successModal').style.display = 'block';  
+                var timeLeft = 5;  
+                var timer = setInterval(function() {  
+                    if (timeLeft <= 0) {  
+                        clearInterval(timer);  
+                        redirectToHome();  
+                    }  
+                    document.getElementById('redirectTimer').innerText = timeLeft;  
+                    timeLeft -=1;  
+                }, 1000);  
+            {% endif %}  
         });  
   
     </script>  

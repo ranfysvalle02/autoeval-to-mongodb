@@ -24,7 +24,7 @@
                 <h1>MDBEvalHub: New Evaluator</h1>  
             </div>  
             <div class="header-buttons">  
-                <a href="/" class="btn header-btn">Back to Home</a>  
+                <a href="{{ url_for('index') }}" class="btn header-btn">Back to Home</a>  
             </div>  
         </div>  
     </header>  
@@ -46,13 +46,6 @@
   
     <!-- Main Content -->  
     <main>  
-        {% if error_message %}  
-            <p class="error">{{ error_message }}</p>  
-        {% endif %}  
-        {% if success_message %}  
-            <p class="success">{{ success_message }}</p>  
-        {% endif %}  
-  
         <!-- Wizard Form -->  
         <section>  
             <form id="create_evaluator_form" method="post" action="{{ url_for('manage_evaluators') }}">  
@@ -158,6 +151,17 @@
             </form>  
         </section>  
   
+        <!-- Success Modal -->  
+        <div id="successModal" class="modal">  
+            <div class="modal-content">  
+                <h2>Evaluator Created Successfully</h2>  
+                <p>Your evaluator has been created successfully. You will be redirected to the home page in <span id="redirectTimer">5</span> seconds.</p>  
+                <div class="form-actions">  
+                    <button type="button" class="btn primary" onclick="redirectToHome()">Go to Home Now</button>  
+                </div>  
+            </div>  
+        </div>  
+  
         <!-- Modal for Existing Evaluators -->  
         <div id="evaluatorsModal" class="modal">  
             <div class="modal-content">  
@@ -248,6 +252,10 @@
         // Include the showLoading function  
         function showLoading() {  
             document.getElementById('loadingModal').style.display = 'block';  
+        }  
+  
+        function redirectToHome() {  
+            window.location.href = "{{ url_for('index') }}";  
         }  
   
         function toggleEvaluatorFields() {  
@@ -426,6 +434,20 @@
         document.addEventListener('DOMContentLoaded', function() {  
             showTab(currentTab); // Display the current tab  
             toggleEvaluatorFields(); // Initialize fields based on evaluator type  
+  
+            {% if success_message %}  
+                // If success_message is set, show the success modal and redirect after a delay  
+                document.getElementById('successModal').style.display = 'block';  
+                var timeLeft = 5;  
+                var timer = setInterval(function() {  
+                    if (timeLeft <= 0) {  
+                        clearInterval(timer);  
+                        redirectToHome();  
+                    }  
+                    document.getElementById('redirectTimer').innerText = timeLeft;  
+                    timeLeft -=1;  
+                }, 1000);  
+            {% endif %}  
         });  
   
         // Functions to open and close the Evaluators Modal  
