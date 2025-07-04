@@ -55,14 +55,14 @@ def index():
   
     default_response_criteria = """  
 - Provide a concise answer to the question based ONLY on the context.  
-    """.strip()  
+        """.strip()  
     default_system_prompt = """  
 Below is the context, which includes plots of movies.  
   
 [context]  
 {context}  
 [/context]  
-    """.strip()  
+        """.strip()  
     default_user_prompt = """  
 [response_criteria]  
 {response_criteria}  
@@ -71,7 +71,7 @@ Below is the context, which includes plots of movies.
 [question]  
 {question}  
 [/question]  
-    """.strip()  
+        """.strip()  
   
     # Prepare the list of available metrics and mark Factuality as selected by default  
     available_metrics = [{'name': name, 'selected': (name == 'Factuality')} for name in autoeval.METRICS.keys()]  
@@ -164,6 +164,7 @@ def get_previous_runs():
                 "test_cases.input_prompt": 1,  
                 "selected_metrics": 1,  
                 "total_duration_seconds": 1,  # Include the total duration  
+                "embedding_model_name": 1,     # Include embedding model name  
             }  
         ).sort("timestamp", -1).limit(10)  
     )  
@@ -343,6 +344,9 @@ def run_test():
         embedding_model_name,  
         selected_fields  # Pass it here  
     )  
+  
+    # Include embedding_model_name in test_run_data  
+    test_run_data['embedding_model_name'] = embedding_model_name  
   
     # Save test run data to MongoDB  
     inserted_id = autoeval.test_runs_collection.insert_one(test_run_data).inserted_id  
