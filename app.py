@@ -16,6 +16,7 @@ import time
 import bson  
 import decimal  
 import logging  
+import hashlib  # Import hashlib for hashing filters  
 from autoevals import Factuality, LLMClassifier, init  
 from autoevals.ragas import ContextRelevancy, Faithfulness  
   
@@ -394,9 +395,25 @@ def list_indexes():
             else:  
                 match_stage = {}  
   
+            # Generate filter hash  
+            try:  
+                filter_str = json.dumps(match_stage, sort_keys=True)  
+            except Exception as e:  
+                error_message = f"Error serializing match stage: {e}"  
+                return render_template(  
+                    'list_indexes.html',  
+                    current_year=datetime.datetime.utcnow().year,  
+                    error_message=error_message,  
+                    success_message=success_message,  
+                    embedding_models=autoeval.EMBEDDING_MODELS,  # Pass embedding models to template  
+                    source_databases=autoeval.get_databases()  # Pass source databases to template  
+                )  
+  
+            filter_hash = hashlib.md5(filter_str.encode('utf-8')).hexdigest()[:8]  
+  
             # Set destination db and collection  
             destination_db_name = 'mdb_autoevals'  
-            destination_collection_name = f"{db_name}__{collection_name}"  
+            destination_collection_name = f"{db_name}__{collection_name}__{filter_hash}"  
   
             # Ensure that only one source field is specified  
             if not source_field or ',' in source_field or ' ' in source_field.strip():  
@@ -428,8 +445,14 @@ def list_indexes():
                     try:  
                         # Generate embeddings and clone documents  
                         autoeval.generate_embeddings_for_collection(  
-                            db_name, collection_name, source_field, match_stage, embedding_models, records_limit,  
-                            destination_db_name, destination_collection_name)  
+                            source_db_name=db_name,  
+                            source_collection_name=collection_name,  
+                            source_field=source_field,  
+                            match_stage=match_stage,  
+                            embedding_models=embedding_models,  
+                            records_limit=records_limit,  
+                            destination_db_name=destination_db_name,  
+                            destination_collection_name=destination_collection_name)  
   
                         # Create indexes for each selected embedding model  
                         for model_name, model_info in embedding_models.items():  
@@ -506,6 +529,7 @@ def list_indexes():
                                     "destination_db": destination_db_name,  
                                     "destination_collection": destination_collection_name,  
                                     "match_stage": match_stage,  
+                                    "filter_hash": filter_hash,  # Include filter hash  
                                     "embedding_model_name": model_name,  
                                     "embedding_model_deployment_name": model_info.get('deployment_name') or model_info.get('model_name'),  
                                     "records_limit": records_limit,  
