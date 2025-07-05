@@ -1,3 +1,5 @@
+# app.py  
+  
 from flask import Flask, request, render_template, redirect, url_for, session, jsonify  
 import os  
 import sys  
@@ -40,6 +42,21 @@ def index():
         # Convert ObjectId to string for use in templates  
         for entry in idx_meta_entries:  
             entry['_id'] = str(entry['_id'])  
+            # Convert timestamp to string  
+            timestamp = entry.get('timestamp')  
+            if timestamp:  
+                if isinstance(timestamp, datetime.datetime):  
+                    entry['timestamp_str'] = timestamp.strftime('%Y-%m-%d %H:%M:%S')  
+                else:  
+                    entry['timestamp_str'] = str(timestamp)  
+            else:  
+                entry['timestamp_str'] = 'N/A'  
+            # Convert match_stage to string  
+            match_stage = entry.get('match_stage')  
+            if match_stage:  
+                entry['match_stage_str'] = json.dumps(match_stage)  
+            else:  
+                entry['match_stage_str'] = '{}'  
     except Exception as e:  
         autoeval.logger.error(f"Error fetching idx_meta entries: {e}")  
         idx_meta_entries = []  
