@@ -17,6 +17,7 @@ import bson
 import decimal  
 import logging  
 import hashlib  # Import hashlib for hashing filters  
+import uuid     # Import uuid for generating unique identifiers  
 from autoevals import Factuality, LLMClassifier, init  
 from autoevals.ragas import ContextRelevancy, Faithfulness  
   
@@ -413,7 +414,9 @@ def list_indexes():
   
             # Set destination db and collection  
             destination_db_name = 'mdb_autoevals'  
-            destination_collection_name = f"{db_name}__{collection_name}__{filter_hash}"  
+            # Generate a unique suffix using UUID  
+            unique_suffix = uuid.uuid4().hex[:6]  # Generate a unique 6-character suffix  
+            destination_collection_name = f"{db_name}__{collection_name}__{filter_hash}_{unique_suffix}"  
   
             # Ensure that only one source field is specified  
             if not source_field or ',' in source_field or ' ' in source_field.strip():  
@@ -430,8 +433,10 @@ def list_indexes():
                         safe_model_name = autoeval.to_pascal_case(model_name)  
                         # For embedding field name in document  
                         model_info['embedding_field_name_in_doc'] = f"{embedding_field_prefix}{safe_model_name}"  
-                        # For index name  
-                        model_info['index_name'] = f"{embedding_field_prefix}_{safe_model_name}_search_index"  
+                        # For index name, generate a unique suffix  
+                        index_unique_suffix = uuid.uuid4().hex[:6]  
+                        index_name = f"{embedding_field_prefix}_{safe_model_name}_{index_unique_suffix}_search_index"  
+                        model_info['index_name'] = index_name  
                         embedding_models[model_name] = model_info  
                     else:  
                         error_message = f"Model '{model_name}' is not recognized."  

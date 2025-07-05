@@ -596,7 +596,7 @@
                             <option value="">-- Select Index Configuration --</option>  
                             {% for idx_meta in idx_meta_entries %}  
                             <option value="{{ idx_meta['_id'] }}" {% if idx_meta['_id'] == session.get('idx_meta_id') %}selected{% endif %}>  
-                                {{ idx_meta['source_db'] }}.{{ idx_meta['source_collection'] }} - {{ idx_meta['embedding_model_name'] }} - {{ idx_meta['index_name'] }}  
+                                {{ idx_meta['timestamp_str'] }} - {{ idx_meta['source_db'] }}.{{ idx_meta['source_collection'] }} - {{ idx_meta['embedding_model_name'] }} - {{ idx_meta['index_name'] }} - Filter Hash: {{ idx_meta['filter_hash'] }}  
                             </option>  
                             {% endfor %}  
                         </select>  
