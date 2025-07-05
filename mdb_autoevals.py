@@ -780,42 +780,47 @@ class MDBAutoEval:
                     index_exists = True    
                     existing_definition = index.get('definition', {})    
                     # Build the new index definition    
-                    new_definition = {    
-                        "mappings": {    
-                            "dynamic": False,    
-                            "fields": {    
-                                embedding_field: {    
-                                    "type": "knnVector",    
-                                    "dimensions": num_dimensions,    
-                                    "similarity": {"type": "cosine"}    
-                                }    
-                            }    
-                        }    
-                    }    
+                    new_definition = SearchIndexModel(
+                        definition={
+                            "fields": [
+                                {
+                                    "type": "vector",
+                                    "numDimensions": num_dimensions,
+                                    "path": embedding_field,
+                                    "similarity": "cosine"
+                                }
+                            ]
+                        },
+                        name=index_name,
+                        type="vectorSearch"
+                    )
                     if existing_definition == new_definition:    
                         self.logger.info(f"Index '{index_name}' already exists with the same definition.")    
                         return True    
                     else:    
                         # Update the index with the new definition    
                         collection.drop_search_index(index_name)    
-                        collection.create_search_index(name=index_name, definition=new_definition)    
+                        collection.create_search_index(definition=new_definition)    
                         self.logger.info(f"Index '{index_name}' updated with new definition.")    
                         return True    
             if not index_exists:    
                 # Create the index    
-                new_definition = {    
-                    "mappings": {    
-                        "dynamic": False,    
-                        "fields": {    
-                            embedding_field: {    
-                                "type": "knnVector",    
-                                "dimensions": num_dimensions,    
-                                "similarity": {"type": "cosine"}    
-                            }    
-                        }    
-                    }    
-                }    
-                collection.create_search_index(name=index_name, definition=new_definition)    
+                new_definition = SearchIndexModel(
+                    definition={
+                        "fields": [
+                            {
+                                "type": "vector",
+                                "numDimensions": num_dimensions,
+                                "path": embedding_field,
+                                "similarity": "cosine"
+                            }
+                        ]
+                    },
+                    name=index_name,
+                    type="vectorSearch"
+                )
+                    
+                collection.create_search_index(definition=new_definition)    
                 self.logger.info(f"Index '{index_name}' created successfully.")    
                 return True    
         except Exception as e:    
