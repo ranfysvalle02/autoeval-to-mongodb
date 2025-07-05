@@ -396,10 +396,14 @@
                         previousRunsTableBody.innerHTML = '<tr><td colspan="5">No previous runs available.</td></tr>';  
                     }  
                 } else {  
+                    var previousRunsTableBody = document.getElementById('previous_runs_table_body');  
+                    previousRunsTableBody.innerHTML = '<tr><td colspan="5">Failed to load previous runs.</td></tr>';  
                     console.error('Failed to load previous runs.');  
                 }  
             };  
             xhr.onerror = function() {  
+                var previousRunsTableBody = document.getElementById('previous_runs_table_body');  
+                previousRunsTableBody.innerHTML = '<tr><td colspan="5">Failed to load previous runs.</td></tr>';  
                 console.error('Failed to load previous runs.');  
             };  
             xhr.send();  
@@ -474,9 +478,12 @@
             showTab(currentTab); // Display the current tab  
             // Existing DOMContentLoaded code...  
             // Initialize event listener for idx_meta_id  
-            document.getElementById('idx_meta_id').addEventListener('change', loadFieldsAndTestCases);  
-            if (document.getElementById('idx_meta_id').value !== '') {  
-                loadFieldsAndTestCases();  
+            var idxMetaIdElement = document.getElementById('idx_meta_id');  
+            if (idxMetaIdElement) {  
+                idxMetaIdElement.addEventListener('change', loadFieldsAndTestCases);  
+                if (idxMetaIdElement.value !== '') {  
+                    loadFieldsAndTestCases();  
+                }  
             }  
             // Initialize collapsibles if any are present  
             initializeCollapsibles();  
@@ -583,6 +590,7 @@
                     </div>  
                     <!-- Index Configuration Selection -->  
                     <div class="form-group">  
+                        {% if idx_meta_entries and idx_meta_entries|length > 0 %}  
                         <label for="idx_meta_id">Select Index Configuration:</label>  
                         <select id="idx_meta_id" name="idx_meta_id" required>  
                             <option value="">-- Select Index Configuration --</option>  
@@ -592,6 +600,9 @@
                             </option>  
                             {% endfor %}  
                         </select>  
+                        {% else %}  
+                        <p>No index configurations found. Please <a href="{{ url_for('list_indexes') }}">create a new index</a>.</p>  
+                        {% endif %}  
                     </div>  
                 </div>  
           
@@ -632,6 +643,7 @@
           
                 <!-- Tab 4: Fields and Test Cases -->  
                 <div class="tab">  
+                    {% if idx_meta_entries and idx_meta_entries|length > 0 %}  
                     <!-- Fields Selection -->  
                     <div class="form-group">  
                         <label>Select Fields to Include in Context:</label>  
@@ -658,6 +670,9 @@
                         </table>  
                     </div>  
                     <button type="button" class="btn primary" onclick="openAddTestCaseModal()"><i class="fa fa-plus"></i> Add New Test Case</button>  
+                    {% else %}  
+                    <p>No index configurations available. Please <a href="{{ url_for('list_indexes') }}">create a new index</a> to manage test cases.</p>  
+                    {% endif %}  
                 </div>  
           
                 <!-- Tab 5: Review & Run -->  
@@ -690,7 +705,7 @@
                     </thead>  
                     <tbody id="previous_runs_table_body">  
                         <!-- Previous runs will be populated via JavaScript -->  
-                        <tr><td colspan="5">Loading previous runs...</td></tr>  
+                        <tr><td colspan="5">No previous runs available.</td></tr>  
                     </tbody>  
                 </table>  
             </div>  
@@ -714,7 +729,7 @@
     </main>  
           
     <footer>  
-      
+      <!-- You can add footer content here if needed -->  
     </footer>  
 </body>  
 </html>  
