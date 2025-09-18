@@ -514,7 +514,10 @@ class MDBAutoEval:
   
     def test_rag_task_with_metrics(self, test_dataset, deployment_names, response_criteria, system_prompt_template, user_prompt_template, selected_metrics,  
                                    db_name, collection_name, index_name, vector_field, embedding_model_name, selected_fields):  
-        """Runs the RAG task on test data for multiple deployment names, evaluates selected metrics, and returns the results."""  
+        """  
+        Runs the RAG task on test data, evaluates selected metrics, and returns the results.  
+        Handles test cases with pre-generated outputs if they are provided in the test_dataset.  
+        """  
         test_run = {  
             "timestamp": datetime.datetime.utcnow().isoformat(),  
             "deployment_names": deployment_names,  # Note the plural key  
@@ -547,29 +550,44 @@ class MDBAutoEval:
             model_test_cases = []  
             for idx, test_case in enumerate(test_dataset):  
                 input_prompt = test_case["input"]  
-                expected_output = test_case["expected"].strip()  
+                expected_output = test_case.get("expected", "").strip()  
   
-                generated_output, messages, context_docs = self.run_rag_task(  
-                    input_prompt,  
-                    deployment_name,  
-                    response_criteria,  
-                    system_prompt_template,  
-                    user_prompt_template,  
-                    db_name,  
-                    collection_name,  
-                    index_name,  
-                    vector_field,  
-                    embedding_model_name,  
-                    selected_fields  
-                )  
+                pre_generated_output = test_case.get("generated_output")  
+                pre_generated_context = test_case.get("context")  
   
-                # Reconstruct context_str from context_docs  
-                if context_docs:  
-                    context_str = "\n".join(  
-                        [json.dumps(doc, default=self.bson_serializer, indent=2) for doc in context_docs]  
-                    )  
+                if pre_generated_output is not None:  
+                    # Use pre-generated output and context  
+                    generated_output = pre_generated_output  
+                    messages = []  # No new LLM call, so no messages  
+                    if pre_generated_context:  
+                        if isinstance(pre_generated_context, list):  
+                            context_docs = pre_generated_context  
+                            context_str = "\n".join([json.dumps(doc, default=self.bson_serializer, indent=2) for doc in context_docs])  
+                        else:  # Assume it's a raw string  
+                            context_docs = []  # We don't have structured docs, just the string  
+                            context_str = str(pre_generated_context)  
+                    else:  
+                        context_docs = []  
+                        context_str = "No context provided."  
                 else:  
-                    context_str = "No specific context was found."  
+                    # Generate output using the RAG task  
+                    generated_output, messages, context_docs = self.run_rag_task(  
+                        input_prompt,  
+                        deployment_name,  
+                        response_criteria,  
+                        system_prompt_template,  
+                        user_prompt_template,  
+                        db_name,  
+                        collection_name,  
+                        index_name,  
+                        vector_field,  
+                        embedding_model_name,  
+                        selected_fields  
+                    )  
+                    if context_docs:  
+                        context_str = "\n".join([json.dumps(doc, default=self.bson_serializer, indent=2) for doc in context_docs])  
+                    else:  
+                        context_str = "No specific context was found."  
   
                 metric_results = {}  
   
