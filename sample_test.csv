@@ -1,0 +1,5 @@
+input,expected,generated_output,context
+"What is the main function of a MongoDB Atlas Search index?","The main function is to enable fast, relevance-based full-text search and vector search capabilities on data stored in a MongoDB collection.","An Atlas Search index is primarily used to facilitate efficient and relevance-based searching, including full-text and vector search, directly on your MongoDB data.","[{'summary': 'MongoDB Atlas Search provides a way to build powerful, fast, and relevant search on your data. It supports full-text search, faceting, and vector search for AI-powered applications.'}]"
+"Who wrote the book 'Cosmos'?","The book 'Cosmos' was written by Carl Sagan.","",""
+"What year was the Python programming language first released?","Python was first released in 1991.","The initial release of the Python language was in the year 1991.","[{'fact': 'Guido van Rossum began working on Python in the late 1980s and its first public release was in 1991.'}]"
+"What is the capital of Canada?","The capital of Canada is Ottawa.","",""
